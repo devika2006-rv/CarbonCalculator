@@ -275,19 +275,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ setActiveTab }) => {
             </button>
           </form>
 
-          <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200/80 text-[11px] text-amber-900 text-center space-y-1">
-            <span className="font-semibold">Coordinators default credentials:</span>
-            <button
-              type="button"
-              onClick={() => {
-                setAdminEmail('admin@vastenergycell.in');
-                setAdminPassword('vastEnergyCell@2026');
-              }}
-              className="font-mono text-amber-950 font-bold underline block mx-auto hover:text-black cursor-pointer text-xs"
-            >
-              Click to autofill: admin@vastenergycell.in / vastEnergyCell@2026
-            </button>
-          </div>
+
         </div>
       </div>
     );

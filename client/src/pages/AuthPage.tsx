@@ -320,19 +320,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ setActiveTab }) => {
               <span>Continue with Google</span>
             </button>
 
-            <div className="p-2.5 bg-emerald-50/70 rounded-xl border border-emerald-200/80 text-[11px] text-emerald-900 flex items-center justify-between">
-              <span>Campus evaluator or volunteer?</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setLoginEmail('volunteer@vidya.ac.in');
-                  setLoginPassword('vidya@2026');
-                }}
-                className="text-emerald-800 hover:text-emerald-950 font-bold underline cursor-pointer"
-              >
-                Autofill demo login
-              </button>
-            </div>
+
 
             {/* Quick Admin Access Link inside login form */}
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
@@ -411,19 +399,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ setActiveTab }) => {
               <ArrowRight className="w-4 h-4" />
             </button>
 
-            <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-200/80 text-[11px] text-amber-900 text-center space-y-1">
-              <span className="font-semibold">Coordinators default credentials:</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setAdminEmail('admin@vastenergycell.in');
-                  setAdminPassword('vastEnergyCell@2026');
-                }}
-                className="font-mono text-amber-950 font-bold underline block mx-auto hover:text-black cursor-pointer text-xs"
-              >
-                Click to autofill: admin@vastenergycell.in / vastEnergyCell@2026
-              </button>
-            </div>
+
 
             <div className="text-center pt-1">
               <button
