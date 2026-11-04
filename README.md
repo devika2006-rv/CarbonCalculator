@@ -2,6 +2,8 @@
 > **"Understand. Calculate. Reduce."**  
 > *"Your Everyday Choices Shape Our Planet. Small Changes. Meaningful Impact."*
 
+[![Live Website](https://img.shields.io/badge/Live_Website-devika2006--rv.github.io%2FCarbonCalculator-10b981?style=for-the-badge&logo=googlechrome&logoColor=white)](https://devika2006-rv.github.io/CarbonCalculator/)
+
 [![GitHub Repository](https://img.shields.io/badge/GitHub-devika2006--rv%2FCarbonCalculator-emerald?style=flat&logo=github)](https://github.com/devika2006-rv/CarbonCalculator)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-v18%2B%20%7C%20v22-green?logo=node.js)](https://nodejs.org)
