@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+:root {
+  --color-forest: #0F3823;
+  --color-emerald: #10B981;
+  --color-mint: #ECFDF5;
+  --color-sky: #0284C7;
+  --color-amber: #F59E0B;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background-color: #F8FAF8;
+  color: #1E293B;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #F1F5F9;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Print optimizations for administrative reports */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
