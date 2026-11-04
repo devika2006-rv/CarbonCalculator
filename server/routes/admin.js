@@ -452,7 +452,7 @@ router.get('/export/csv', requireAdmin, (req, res) => {
           `"${r.institution_type}"`,
           `"${r.district}"`,
           `"${r.created_at}"`,
-          `"${r.last_login_at}"`,
+          `"${r.last_login_at || 'Never'}"`,
           r.green_points
         ].join(',') + '\n';
       }
