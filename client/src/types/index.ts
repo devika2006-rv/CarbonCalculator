@@ -12,7 +12,7 @@ export interface User {
   institution_type: InstitutionType;
   district: string;
   created_at: string;
-  last_login_at: string;
+  last_login_at?: string;
 }
 
 export interface UserStats {
