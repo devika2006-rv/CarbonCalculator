@@ -9,8 +9,7 @@ import {
   Search,
   Sparkles,
   ShieldCheck,
-  CheckCircle2,
-  Calendar
+  CheckCircle2
 } from 'lucide-react';
 import { api } from '../services/api';
 import { CommunityOverview, InstitutionLeaderboardItem } from '../types';
@@ -243,36 +242,6 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ setActiveTab }) =>
               ) : (
                 <p className="text-slate-400 text-xs py-3 text-center italic">No registered cohort members yet.</p>
               )}
-            </div>
-          </div>
-
-          {/* Active Campaigns */}
-          <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-4">
-            <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-sky-600" />
-              Campus Sustainability Drives
-            </h3>
-
-            <div className="space-y-3 text-xs">
-              <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-100 space-y-1">
-                <div className="flex justify-between font-bold text-emerald-900 text-xs">
-                  <span>Punarjjani Asset Drive</span>
-                  <span className="text-[10px] text-emerald-700 uppercase">Ongoing</span>
-                </div>
-                <p className="text-slate-600 text-[11px] leading-relaxed">
-                  Vidya NSS volunteers refurbish non-functional hospital and laboratory equipment, diverting tons of e-waste from landfills.
-                </p>
-              </div>
-
-              <div className="p-3 rounded-2xl bg-sky-50/70 border border-sky-100 space-y-1">
-                <div className="flex justify-between font-bold text-sky-900 text-xs">
-                  <span>Campus Energy Audit 2026</span>
-                  <span className="text-[10px] text-sky-700 uppercase">Active</span>
-                </div>
-                <p className="text-slate-600 text-[11px] leading-relaxed">
-                  KTU NSS Energy Cell initiative helping engineering campuses benchmark lighting efficiency and eliminate phantom standby power.
-                </p>
-              </div>
             </div>
           </div>
         </div>
