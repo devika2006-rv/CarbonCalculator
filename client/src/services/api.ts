@@ -422,21 +422,15 @@ export const api = {
         const stored = localStorage.getItem('cc_current_user');
         if (stored) {
           const user = JSON.parse(stored);
+          const userHistory = JSON.parse(localStorage.getItem('cc_user_history') || '[]');
+          const completed = JSON.parse(localStorage.getItem('cc_completed_challenges') || '[]');
           const stats: UserStats = {
-            totalPoints: 210,
-            calcCount: 3,
-            challengeCount: 5,
-            badgesCount: 3,
-            badges: [
-              {
-                id: 'carbon-conscious',
-                badge_id: 'carbon-conscious',
-                badge_name: 'Carbon Conscious',
-                badge_description: 'Completed your baseline footprint audit',
-                awarded_at: new Date().toISOString()
-              }
-            ],
-            latestCalc: null
+            totalPoints: completed.length * 20,
+            calcCount: userHistory.length,
+            challengeCount: completed.length,
+            badgesCount: 0,
+            badges: [],
+            latestCalc: userHistory[0] || null
           };
           return { user, stats };
         }
@@ -547,28 +541,7 @@ export const api = {
         return await request<{ history: CalculationRecord[] }>('/calculator/history');
       } catch {
         const stored = localStorage.getItem('cc_user_history');
-        if (stored) {
-          return { history: JSON.parse(stored) };
-        }
-        return {
-          history: [
-            {
-              id: 1,
-              user_id: 1,
-              daily_co2_kg: 4.45,
-              monthly_co2_kg: 135.4,
-              annual_co2_tonnes: 1.62,
-              electricity_co2_kg: 68.2,
-              transport_co2_kg: 32.5,
-              food_co2_kg: 24.1,
-              plastic_co2_kg: 4.2,
-              waste_co2_kg: 3.1,
-              lifestyle_co2_kg: 3.3,
-              inputs: {} as any,
-              calculated_at: new Date(Date.now() - 86400000 * 3).toISOString()
-            }
-          ]
-        };
+        return { history: stored ? JSON.parse(stored) : [] };
       }
     },
   },
@@ -589,15 +562,16 @@ export const api = {
           body: JSON.stringify({ notes }),
         });
       } catch {
-        const completed = JSON.parse(localStorage.getItem('cc_completed_challenges') || '[]');
+        const completed: number[] = JSON.parse(localStorage.getItem('cc_completed_challenges') || '[]');
         if (!completed.includes(id)) {
           completed.push(id);
           localStorage.setItem('cc_completed_challenges', JSON.stringify(completed));
         }
+        const totalPoints = completed.length * 20;
         return {
-          message: 'Challenge verified! +40 Green Points added to your profile.',
-          pointsEarned: 40,
-          totalPoints: 250,
+          message: 'Challenge verified! +20 Green Points added to your profile.',
+          pointsEarned: 20,
+          totalPoints,
           newBadges: []
         };
       }
@@ -623,29 +597,34 @@ export const api = {
       try {
         return await request<{ overview: CommunityOverview; categoryCounts: any[]; districtCounts: any[] }>('/community/overview');
       } catch {
-        const registered = JSON.parse(localStorage.getItem('cc_registered_users') || '[]');
-        const totalUsers = 142 + registered.length;
+        const registered: any[] = JSON.parse(localStorage.getItem('cc_registered_users') || '[]');
+        const userHistory: any[] = JSON.parse(localStorage.getItem('cc_user_history') || '[]');
+        const completedChallenges: any[] = JSON.parse(localStorage.getItem('cc_completed_challenges') || '[]');
+
+        const institutionsSet = new Set(registered.map(u => u.institution_name).filter(Boolean));
+
+        const catMap: Record<string, number> = {};
+        for (const u of registered) {
+          if (u.category) catMap[u.category] = (catMap[u.category] || 0) + 1;
+        }
+        const categoryCounts = Object.entries(catMap).map(([category, count]) => ({ category, count }));
+
+        const distMap: Record<string, number> = {};
+        for (const u of registered) {
+          if (u.district) distMap[u.district] = (distMap[u.district] || 0) + 1;
+        }
+        const districtCounts = Object.entries(distMap).map(([district, user_count]) => ({ district, user_count }));
+
         return {
           overview: {
-            totalUsers,
-            totalInstitutions: 18,
-            totalCalculations: 388 + registered.length * 2,
-            totalChallengesCompleted: 512,
-            totalGreenPoints: 18450
+            totalUsers: registered.length,
+            totalInstitutions: institutionsSet.size,
+            totalCalculations: userHistory.length,
+            totalChallengesCompleted: completedChallenges.length,
+            totalGreenPoints: completedChallenges.length * 20
           },
-          categoryCounts: [
-            { category: 'Student', count: 85 + registered.length },
-            { category: 'NSS Volunteer', count: 42 },
-            { category: 'Teacher', count: 10 },
-            { category: 'General Public', count: 5 }
-          ],
-          districtCounts: [
-            { district: 'Thrissur', count: 68 },
-            { district: 'Ernakulam', count: 28 },
-            { district: 'Palakkad', count: 18 },
-            { district: 'Malappuram', count: 14 },
-            { district: 'Kozhikode', count: 14 }
-          ]
+          categoryCounts,
+          districtCounts
         };
       }
     },
@@ -658,42 +637,32 @@ export const api = {
         const query = params.toString() ? `?${params.toString()}` : '';
         return await request<{ institutions: InstitutionLeaderboardItem[] }>(`/community/institutions${query}`);
       } catch {
-        return {
-          institutions: [
-            {
-              institution_name: 'Vidya Academy of Science & Technology',
-              district: 'Thrissur',
-              institution_type: 'College',
-              participant_count: 54,
-              total_points: 7200,
-              calculations_count: 148
-            },
-            {
-              institution_name: 'Government Engineering College Thrissur',
-              district: 'Thrissur',
-              institution_type: 'College',
-              participant_count: 32,
-              total_points: 4100,
-              calculations_count: 86
-            },
-            {
-              institution_name: 'St. Thomas College Thrissur',
-              district: 'Thrissur',
-              institution_type: 'College',
-              participant_count: 22,
-              total_points: 2850,
-              calculations_count: 59
-            },
-            {
-              institution_name: 'Model Higher Secondary School',
-              district: 'Thrissur',
-              institution_type: 'School',
-              participant_count: 18,
-              total_points: 2150,
-              calculations_count: 42
-            }
-          ]
-        };
+        const registered: any[] = JSON.parse(localStorage.getItem('cc_registered_users') || '[]');
+        const instMap = new Map<string, InstitutionLeaderboardItem>();
+
+        for (const u of registered) {
+          if (!u.institution_name) continue;
+          if (district && u.district?.toLowerCase() !== district.toLowerCase()) continue;
+          if (type && u.institution_type?.toLowerCase() !== type.toLowerCase()) continue;
+
+          const key = u.institution_name.toLowerCase();
+          if (!instMap.has(key)) {
+            instMap.set(key, {
+              institution_name: u.institution_name,
+              institution_type: u.institution_type || 'College',
+              district: u.district || 'Thrissur',
+              participant_count: 0,
+              total_points: 0,
+              calculations_count: 0
+            });
+          }
+          const item = instMap.get(key)!;
+          item.participant_count += 1;
+          item.total_points += (u.total_points || 0);
+          item.calculations_count += (u.calc_count || 0);
+        }
+
+        return { institutions: Array.from(instMap.values()) };
       }
     },
 
@@ -701,14 +670,13 @@ export const api = {
       try {
         return await request<{ districts: any[] }>('/community/districts');
       } catch {
+        const registered: any[] = JSON.parse(localStorage.getItem('cc_registered_users') || '[]');
+        const distMap: Record<string, number> = {};
+        for (const u of registered) {
+          if (u.district) distMap[u.district] = (distMap[u.district] || 0) + 1;
+        }
         return {
-          districts: [
-            { district: 'Thrissur', count: 68 },
-            { district: 'Ernakulam', count: 28 },
-            { district: 'Palakkad', count: 18 },
-            { district: 'Malappuram', count: 14 },
-            { district: 'Kozhikode', count: 14 }
-          ]
+          districts: Object.entries(distMap).map(([district, count]) => ({ district, count }))
         };
       }
     },
@@ -773,32 +741,82 @@ export const api = {
       try {
         return await request<{ stats: any; categories: any[]; districts: any[]; institutions: any[] }>('/admin/overview');
       } catch {
-        const registered = JSON.parse(localStorage.getItem('cc_registered_users') || '[]');
+        const registered: any[] = JSON.parse(localStorage.getItem('cc_registered_users') || '[]');
+        const userHistory: any[] = JSON.parse(localStorage.getItem('cc_user_history') || '[]');
+        const completedChallenges: any[] = JSON.parse(localStorage.getItem('cc_completed_challenges') || '[]');
+        const contactEnquiries: any[] = JSON.parse(localStorage.getItem('cc_contact_enquiries') || '[]');
+
+        const completedProfiles = registered.filter(u => u.institution_name && u.district).length;
+        const now = Date.now();
+        const sevenDaysAgo = now - 7 * 86400000;
+        const thirtyDaysAgo = now - 30 * 86400000;
+        const startOfToday = new Date().setHours(0, 0, 0, 0);
+        const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+
+        const newRegistrations7d = registered.filter(u => new Date(u.created_at).getTime() >= sevenDaysAgo).length;
+        const newRegistrations30d = registered.filter(u => new Date(u.created_at).getTime() >= thirtyDaysAgo).length;
+        const activeUsers7d = registered.filter(u => u.last_login_at && new Date(u.last_login_at).getTime() >= sevenDaysAgo).length;
+        const activeUsers30d = registered.filter(u => u.last_login_at && new Date(u.last_login_at).getTime() >= thirtyDaysAgo).length;
+
+        const calcsToday = userHistory.filter(c => new Date(c.calculated_at).getTime() >= startOfToday).length;
+        const calcsThisMonth = userHistory.filter(c => new Date(c.calculated_at).getTime() >= startOfMonth).length;
+
+        const catMap: Record<string, number> = {};
+        for (const u of registered) {
+          if (u.category) catMap[u.category] = (catMap[u.category] || 0) + 1;
+        }
+        const categories = Object.entries(catMap).map(([category, count]) => ({ category, count }));
+
+        const distMap: Record<string, number> = {};
+        for (const u of registered) {
+          if (u.district) distMap[u.district] = (distMap[u.district] || 0) + 1;
+        }
+        const districts = Object.entries(distMap).map(([district, count]) => ({ district, count }));
+
+        const instMap = new Map<string, any>();
+        for (const u of registered) {
+          if (!u.institution_name) continue;
+          const key = u.institution_name.toLowerCase();
+          if (!instMap.has(key)) {
+            instMap.set(key, {
+              institution_name: u.institution_name,
+              institution_type: u.institution_type || 'College',
+              district: u.district || 'Thrissur',
+              registered_count: 0,
+              participating_count: 0,
+              calculation_count: 0,
+              total_points: 0
+            });
+          }
+          const item = instMap.get(key);
+          item.registered_count += 1;
+          if ((u.calc_count || 0) > 0 || (u.challenge_count || 0) > 0) {
+            item.participating_count += 1;
+          }
+          item.calculation_count += (u.calc_count || 0);
+          item.total_points += (u.total_points || 0);
+        }
+
         return {
           stats: {
-            totalUsers: 142 + registered.length,
-            totalCalculations: 388 + registered.length * 2,
-            totalChallenges: 512,
-            totalPoints: 18450
+            totalUsers: registered.length,
+            completedProfiles,
+            newRegistrations7d,
+            newRegistrations30d,
+            activeUsers7d,
+            activeUsers30d,
+            totalInstitutions: instMap.size,
+            totalCalculations: userHistory.length,
+            calcsToday,
+            calcsThisMonth,
+            totalChallenges: completedChallenges.length,
+            uniqueChallengeUsers: completedChallenges.length > 0 ? 1 : 0,
+            totalGreenPoints: completedChallenges.length * 20,
+            totalEnquiries: contactEnquiries.length
           },
-          categories: [
-            { category: 'Student', count: 85 + registered.length },
-            { category: 'NSS Volunteer', count: 42 },
-            { category: 'Teacher', count: 10 },
-            { category: 'General Public', count: 5 }
-          ],
-          districts: [
-            { district: 'Thrissur', count: 68 },
-            { district: 'Ernakulam', count: 28 },
-            { district: 'Palakkad', count: 18 },
-            { district: 'Malappuram', count: 14 },
-            { district: 'Kozhikode', count: 14 }
-          ],
-          institutions: [
-            { institution_name: 'Vidya Academy of Science & Technology', count: 54 },
-            { institution_name: 'Government Engineering College Thrissur', count: 32 },
-            { institution_name: 'St. Thomas College Thrissur', count: 22 }
-          ]
+          categories,
+          districts,
+          institutions: Array.from(instMap.values())
         };
       }
     },
@@ -811,37 +829,51 @@ export const api = {
         }
         return await request<{ users: any[]; pagination: any }>(`/admin/users?${params.toString()}`);
       } catch {
-        const baseUsers = [
-          { id: 1, name: 'VAST Energy Cell Coordinator', email: 'admin@vastenergycell.in', role: 'admin', category: 'Teacher', institution_name: 'Vidya Academy of Science & Technology', institution_type: 'College', district: 'Thrissur', created_at: '2026-10-01' },
-          { id: 2, name: 'Anjana (NSS Unit 101)', email: 'anjana.nss@vidya.ac.in', role: 'user', category: 'NSS Volunteer', institution_name: 'Vidya Academy of Science & Technology', institution_type: 'College', district: 'Thrissur', created_at: '2026-10-05' },
-          { id: 3, name: 'Manasa (NSS Unit 200)', email: 'manasa.nss@vidya.ac.in', role: 'user', category: 'NSS Volunteer', institution_name: 'Vidya Academy of Science & Technology', institution_type: 'College', district: 'Thrissur', created_at: '2026-10-08' },
-          { id: 4, name: 'Sarang (NSS Unit 663)', email: 'sarang.nss@vidya.ac.in', role: 'user', category: 'NSS Volunteer', institution_name: 'Vidya Academy of Science & Technology', institution_type: 'College', district: 'Thrissur', created_at: '2026-10-12' },
-          { id: 5, name: 'Fezin (NSS Unit 101)', email: 'fezin.nss@vidya.ac.in', role: 'user', category: 'NSS Volunteer', institution_name: 'Vidya Academy of Science & Technology', institution_type: 'College', district: 'Thrissur', created_at: '2026-10-14' },
-          { id: 6, name: 'Rahul K. (CSE Student)', email: 'rahul.k@gec.ac.in', role: 'user', category: 'Student', institution_name: 'Government Engineering College Thrissur', institution_type: 'College', district: 'Thrissur', created_at: '2026-10-16' },
-          { id: 7, name: 'Sneha P. (NSS Volunteer)', email: 'sneha.p@stthomas.ac.in', role: 'user', category: 'NSS Volunteer', institution_name: 'St. Thomas College Thrissur', institution_type: 'College', district: 'Thrissur', created_at: '2026-10-19' }
-        ];
-        const registered = JSON.parse(localStorage.getItem('cc_registered_users') || '[]');
-        const allUsers = [...registered, ...baseUsers];
+        const registered: any[] = JSON.parse(localStorage.getItem('cc_registered_users') || '[]');
 
-        let filtered = allUsers;
+        let filtered = registered.map(u => ({
+          ...u,
+          is_profile_complete: u.institution_name && u.district ? 1 : 0,
+          total_points: u.total_points || 0,
+          calc_count: u.calc_count || 0,
+          challenge_count: u.challenge_count || 0
+        }));
+
         if (filters.search) {
           const s = filters.search.toLowerCase();
-          filtered = filtered.filter(u => u.name?.toLowerCase().includes(s) || u.email?.toLowerCase().includes(s) || u.institution_name?.toLowerCase().includes(s));
+          filtered = filtered.filter(u =>
+            u.name?.toLowerCase().includes(s) ||
+            u.email?.toLowerCase().includes(s) ||
+            u.institution_name?.toLowerCase().includes(s)
+          );
         }
         if (filters.category) {
           filtered = filtered.filter(u => u.category === filters.category);
         }
         if (filters.district) {
-          filtered = filtered.filter(u => u.district === filters.district);
+          filtered = filtered.filter(u => u.district?.toLowerCase() === filters.district.toLowerCase());
+        }
+        if (filters.institution) {
+          filtered = filtered.filter(u => u.institution_name?.toLowerCase().includes(filters.institution.toLowerCase()));
+        }
+        if (filters.profile_status === 'complete') {
+          filtered = filtered.filter(u => u.is_profile_complete === 1);
+        } else if (filters.profile_status === 'incomplete') {
+          filtered = filtered.filter(u => u.is_profile_complete === 0);
         }
 
+        const page = Number(filters.page) || 1;
+        const limit = Number(filters.limit) || 15;
+        const offset = (page - 1) * limit;
+        const paginated = filtered.slice(offset, offset + limit);
+
         return {
-          users: filtered,
+          users: paginated,
           pagination: {
-            page: 1,
-            limit: 15,
+            page,
+            limit,
             total: filtered.length,
-            totalPages: 1
+            totalPages: Math.max(1, Math.ceil(filtered.length / limit))
           }
         };
       }
@@ -860,32 +892,56 @@ export const api = {
 
     getAnalytics: async () => {
       try {
-        return await request<{ calcsOverTime: any[]; challengeStats: any[]; categoryAverages: any }>('/admin/analytics');
+        return await request<{ calcsOverTime: any[]; challengeStats: any[]; challengeInstitutions: any[]; categoryAverages: any }>('/admin/analytics');
       } catch {
+        const userHistory: any[] = JSON.parse(localStorage.getItem('cc_user_history') || '[]');
+        const completedChallenges: any[] = JSON.parse(localStorage.getItem('cc_completed_challenges') || '[]');
+
+        const dateMap: Record<string, { count: number; totalCo2: number }> = {};
+        let sumElec = 0, sumTrans = 0, sumFood = 0, sumPlas = 0, sumWaste = 0, sumLife = 0;
+        for (const h of userHistory) {
+          const d = (h.calculated_at || '').substring(0, 10) || new Date().toISOString().substring(0, 10);
+          if (!dateMap[d]) dateMap[d] = { count: 0, totalCo2: 0 };
+          dateMap[d].count += 1;
+          dateMap[d].totalCo2 += Number(h.monthly_co2_kg) || 0;
+
+          sumElec += Number(h.electricity_co2_kg) || 0;
+          sumTrans += Number(h.transport_co2_kg) || 0;
+          sumFood += Number(h.food_co2_kg) || 0;
+          sumPlas += Number(h.plastic_co2_kg) || 0;
+          sumWaste += Number(h.waste_co2_kg) || 0;
+          sumLife += Number(h.lifestyle_co2_kg) || 0;
+        }
+
+        const calcsOverTime = Object.entries(dateMap).map(([date, val]) => ({
+          date,
+          count: val.count,
+          avg_co2: Number((val.totalCo2 / val.count).toFixed(2))
+        }));
+
+        const totalC = userHistory.length;
+        const categoryAverages = totalC > 0 ? {
+          avg_electricity: Number((sumElec / totalC).toFixed(2)),
+          avg_transport: Number((sumTrans / totalC).toFixed(2)),
+          avg_food: Number((sumFood / totalC).toFixed(2)),
+          avg_plastic: Number((sumPlas / totalC).toFixed(2)),
+          avg_waste: Number((sumWaste / totalC).toFixed(2)),
+          avg_lifestyle: Number((sumLife / totalC).toFixed(2))
+        } : null;
+
+        const challengeStats = FALLBACK_CHALLENGES.map(c => ({
+          id: c.id,
+          title: c.title,
+          category: c.category,
+          difficulty: c.difficulty,
+          completion_count: completedChallenges.includes(c.id) ? 1 : 0
+        }));
+
         return {
-          calcsOverTime: [
-            { date: '2026-10-25', count: 18 },
-            { date: '2026-10-27', count: 24 },
-            { date: '2026-10-29', count: 32 },
-            { date: '2026-10-31', count: 45 },
-            { date: '2026-11-02', count: 62 },
-            { date: '2026-11-04', count: 88 }
-          ],
-          challengeStats: [
-            { category: 'Electricity', count: 185 },
-            { category: 'Transport', count: 124 },
-            { category: 'Plastic', count: 142 },
-            { category: 'Food Habits', count: 96 },
-            { category: 'Waste', count: 78 }
-          ],
-          categoryAverages: {
-            avgElectricity: 72.4,
-            avgTransport: 38.6,
-            avgFood: 42.1,
-            avgPlastic: 8.4,
-            avgWaste: 4.8,
-            avgLifestyle: 5.2
-          }
+          calcsOverTime,
+          challengeStats,
+          challengeInstitutions: [],
+          categoryAverages
         };
       }
     },
@@ -895,25 +951,7 @@ export const api = {
         return await request<{ enquiries: any[] }>('/admin/enquiries');
       } catch {
         const stored = JSON.parse(localStorage.getItem('cc_contact_enquiries') || '[]');
-        const defaults = [
-          {
-            id: 1,
-            name: 'K. S. Narayanan (Program Officer)',
-            email: 'narayanan.po@nss.ac.in',
-            category: 'Teacher',
-            message: 'We would like to introduce CarbonCalculator during our NSS annual 7-day special camp.',
-            created_at: '2026-11-02 10:30'
-          },
-          {
-            id: 2,
-            name: 'Aiswarya Raj (Student Lead)',
-            email: 'aiswarya.lead@gec.ac.in',
-            category: 'NSS Volunteer',
-            message: 'Requesting permission to present this platform at the KTU Tech Fest Energy Pavilion.',
-            created_at: '2026-11-03 14:15'
-          }
-        ];
-        return { enquiries: [...stored, ...defaults] };
+        return { enquiries: stored };
       }
     }
   }

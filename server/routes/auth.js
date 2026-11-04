@@ -48,8 +48,8 @@ router.post('/register', (req, res) => {
     const password_hash = bcrypt.hashSync(password, salt);
 
     const result = db.prepare(`
-      INSERT INTO users (name, email, password_hash, role, category, institution_name, institution_type, district)
-      VALUES (?, ?, ?, 'user', ?, ?, ?, ?)
+      INSERT INTO users (name, email, password_hash, role, category, institution_name, institution_type, district, last_login_at)
+      VALUES (?, ?, ?, 'user', ?, ?, ?, ?, NULL)
     `).run(
       name.trim(),
       email.toLowerCase().trim(),

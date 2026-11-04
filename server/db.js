@@ -27,7 +27,7 @@ export function initDatabase() {
       institution_type TEXT DEFAULT 'College', -- 'School', 'College', 'Other'
       district TEXT DEFAULT 'Thrissur',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      last_login_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      last_login_at DATETIME DEFAULT NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);

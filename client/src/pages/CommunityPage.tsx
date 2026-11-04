@@ -231,14 +231,18 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ setActiveTab }) =>
               Volunteer & Student Cohorts
             </h3>
             <div className="space-y-2 text-xs">
-              {categoryCounts.map((cat) => (
-                <div key={cat.category} className="flex justify-between items-center p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                  <span className="font-semibold text-slate-700">{cat.category}</span>
-                  <span className="font-bold text-emerald-700 bg-white px-2 py-0.5 rounded-md border border-slate-200">
-                    {cat.count} members
-                  </span>
-                </div>
-              ))}
+              {categoryCounts.length > 0 ? (
+                categoryCounts.map((cat) => (
+                  <div key={cat.category} className="flex justify-between items-center p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                    <span className="font-semibold text-slate-700">{cat.category}</span>
+                    <span className="font-bold text-emerald-700 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                      {cat.count} members
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-slate-400 text-xs py-3 text-center italic">No registered cohort members yet.</p>
+              )}
             </div>
           </div>
 

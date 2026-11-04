@@ -97,19 +97,40 @@ router.post('/bootstrap', (req, res) => {
 router.get('/overview', requireAdmin, (req, res) => {
   try {
     const totalUsers = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'user'").get().count;
-    const totalInstitutions = db.prepare("SELECT COUNT(DISTINCT institution_name) as count FROM users WHERE institution_name != ''").get().count;
+    const completedProfiles = db.prepare(`
+      SELECT COUNT(*) as count FROM users
+      WHERE role = 'user' AND institution_name IS NOT NULL AND institution_name != ''
+        AND district IS NOT NULL AND district != ''
+    `).get().count;
+    const newRegistrations7d = db.prepare(`
+      SELECT COUNT(*) as count FROM users
+      WHERE role = 'user' AND created_at >= date('now', '-7 days')
+    `).get().count;
+    const newRegistrations30d = db.prepare(`
+      SELECT COUNT(*) as count FROM users
+      WHERE role = 'user' AND created_at >= date('now', '-30 days')
+    `).get().count;
+    const activeUsers7d = db.prepare(`
+      SELECT COUNT(*) as count FROM users
+      WHERE role = 'user' AND last_login_at IS NOT NULL AND last_login_at >= date('now', '-7 days')
+    `).get().count;
+    const activeUsers30d = db.prepare(`
+      SELECT COUNT(*) as count FROM users
+      WHERE role = 'user' AND last_login_at IS NOT NULL AND last_login_at >= date('now', '-30 days')
+    `).get().count;
+    const totalInstitutions = db.prepare(`
+      SELECT COUNT(DISTINCT institution_name) as count FROM users
+      WHERE role = 'user' AND institution_name IS NOT NULL AND institution_name != ''
+    `).get().count;
     const totalCalculations = db.prepare('SELECT COUNT(*) as count FROM carbon_calculations').get().count;
+    const calcsToday = db.prepare("SELECT COUNT(*) as count FROM carbon_calculations WHERE date(calculated_at) = date('now')").get().count;
+    const calcsThisMonth = db.prepare("SELECT COUNT(*) as count FROM carbon_calculations WHERE calculated_at >= date('now', 'start of month')").get().count;
     const totalChallenges = db.prepare('SELECT COUNT(*) as count FROM user_challenge_completions').get().count;
+    const uniqueChallengeUsers = db.prepare('SELECT COUNT(DISTINCT user_id) as count FROM user_challenge_completions').get().count;
     const totalEnquiries = db.prepare('SELECT COUNT(*) as count FROM enquiries').get().count;
 
     const pointsSum = db.prepare('SELECT SUM(total_points) as sum FROM user_points').get();
     const totalGreenPoints = pointsSum ? (pointsSum.sum || 0) : 0;
-
-    // Active in last 30 days
-    const activeUsers = db.prepare(`
-      SELECT COUNT(*) as count FROM users
-      WHERE role = 'user' AND last_login_at >= date('now', '-30 days')
-    `).get().count;
 
     // Categories
     const categories = db.prepare(`
@@ -120,27 +141,45 @@ router.get('/overview', requireAdmin, (req, res) => {
     // Districts
     const districts = db.prepare(`
       SELECT district, COUNT(*) as count FROM users
-      WHERE district != '' GROUP BY district ORDER BY count DESC
+      WHERE role = 'user' AND district IS NOT NULL AND district != ''
+      GROUP BY district ORDER BY count DESC
     `).all();
 
-    // Top Institutions
+    // Top Institutions: genuine registered & participating counts from DB
     const institutions = db.prepare(`
-      SELECT institution_name, institution_type, district, COUNT(id) as student_count
-      FROM users
-      WHERE institution_name != ''
-      GROUP BY institution_name, institution_type, district
-      ORDER BY student_count DESC
-      LIMIT 10
+      SELECT
+        u.institution_name,
+        u.institution_type,
+        u.district,
+        COUNT(DISTINCT u.id) as registered_count,
+        COUNT(DISTINCT CASE WHEN cc.id IS NOT NULL OR ucc.id IS NOT NULL THEN u.id END) as participating_count,
+        COUNT(DISTINCT cc.id) as calculation_count,
+        COALESCE(SUM(up.total_points), 0) as total_points
+      FROM users u
+      LEFT JOIN carbon_calculations cc ON u.id = cc.user_id
+      LEFT JOIN user_challenge_completions ucc ON u.id = ucc.user_id
+      LEFT JOIN user_points up ON u.id = up.user_id
+      WHERE u.role = 'user' AND u.institution_name IS NOT NULL AND u.institution_name != ''
+      GROUP BY u.institution_name, u.institution_type, u.district
+      ORDER BY registered_count DESC, total_points DESC
+      LIMIT 20
     `).all();
 
     res.json({
       stats: {
         totalUsers,
+        completedProfiles,
+        newRegistrations7d,
+        newRegistrations30d,
+        activeUsers7d,
+        activeUsers30d,
         totalInstitutions,
         totalCalculations,
+        calcsToday,
+        calcsThisMonth,
         totalChallenges,
+        uniqueChallengeUsers,
         totalGreenPoints,
-        activeUsers,
         totalEnquiries
       },
       categories,
@@ -156,7 +195,7 @@ router.get('/overview', requireAdmin, (req, res) => {
 // GET /api/admin/users (Search, Filter, Pagination)
 router.get('/users', requireAdmin, (req, res) => {
   try {
-    const { search, district, institution, category, type, page = 1, limit = 25 } = req.query;
+    const { search, district, institution, category, type, profile_status, page = 1, limit = 25 } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
     let baseQuery = `
@@ -191,12 +230,22 @@ router.get('/users', requireAdmin, (req, res) => {
       params.push(type);
     }
 
+    if (profile_status === 'complete') {
+      baseQuery += ` AND u.institution_name IS NOT NULL AND u.institution_name != '' AND u.district IS NOT NULL AND u.district != ''`;
+    } else if (profile_status === 'incomplete') {
+      baseQuery += ` AND (u.institution_name IS NULL OR u.institution_name = '' OR u.district IS NULL OR u.district = '')`;
+    }
+
     const totalCount = db.prepare(`SELECT COUNT(*) as count ${baseQuery}`).get(...params).count;
 
     const users = db.prepare(`
       SELECT
         u.id, u.name, u.email, u.category, u.institution_name, u.institution_type,
         u.district, u.created_at, u.last_login_at,
+        CASE
+          WHEN u.institution_name IS NOT NULL AND u.institution_name != '' AND u.district IS NOT NULL AND u.district != ''
+          THEN 1 ELSE 0
+        END as is_profile_complete,
         COALESCE(up.total_points, 0) as total_points,
         (SELECT COUNT(*) FROM carbon_calculations cc WHERE cc.user_id = u.id) as calc_count,
         (SELECT COUNT(*) FROM user_challenge_completions ucc WHERE ucc.user_id = u.id) as challenge_count
@@ -211,7 +260,7 @@ router.get('/users', requireAdmin, (req, res) => {
         total: totalCount,
         page: Number(page),
         limit: Number(limit),
-        totalPages: Math.ceil(totalCount / Number(limit))
+        totalPages: Math.max(1, Math.ceil(totalCount / Number(limit)))
       }
     });
   } catch (error) {
@@ -263,28 +312,40 @@ router.get('/analytics', requireAdmin, (req, res) => {
 
     // Challenge completion counts by challenge
     const challengeStats = db.prepare(`
-      SELECT c.title, c.category, c.difficulty, COUNT(ucc.id) as completion_count
+      SELECT c.id, c.title, c.category, c.difficulty, COUNT(ucc.id) as completion_count
       FROM challenges c
       LEFT JOIN user_challenge_completions ucc ON c.id = ucc.challenge_id
       GROUP BY c.id
       ORDER BY completion_count DESC
     `).all();
 
+    // Challenge participation by institution
+    const challengeInstitutions = db.prepare(`
+      SELECT u.institution_name, COUNT(ucc.id) as completion_count, COUNT(DISTINCT ucc.user_id) as participant_count
+      FROM user_challenge_completions ucc
+      JOIN users u ON ucc.user_id = u.id
+      WHERE u.institution_name IS NOT NULL AND u.institution_name != ''
+      GROUP BY u.institution_name
+      ORDER BY completion_count DESC
+      LIMIT 10
+    `).all();
+
     // Emission category averages
     const categoryAverages = db.prepare(`
       SELECT
-        AVG(electricity_co2_kg) as avg_electricity,
-        AVG(transport_co2_kg) as avg_transport,
-        AVG(food_co2_kg) as avg_food,
-        AVG(plastic_co2_kg) as avg_plastic,
-        AVG(waste_co2_kg) as avg_waste,
-        AVG(lifestyle_co2_kg) as avg_lifestyle
+        COALESCE(AVG(electricity_co2_kg), 0) as avg_electricity,
+        COALESCE(AVG(transport_co2_kg), 0) as avg_transport,
+        COALESCE(AVG(food_co2_kg), 0) as avg_food,
+        COALESCE(AVG(plastic_co2_kg), 0) as avg_plastic,
+        COALESCE(AVG(waste_co2_kg), 0) as avg_waste,
+        COALESCE(AVG(lifestyle_co2_kg), 0) as avg_lifestyle
       FROM carbon_calculations
     `).get();
 
     res.json({
       calcsOverTime,
       challengeStats,
+      challengeInstitutions,
       categoryAverages
     });
   } catch (error) {

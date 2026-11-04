@@ -16,50 +16,14 @@ interface AuthContextType {
   refreshUser: () => Promise<void>;
 }
 
-export function createDefaultStats(points = 210, calcs = 3, challenges = 5, badges = 3): UserStats {
+export function createDefaultStats(points = 0, calcs = 0, challenges = 0, badges = 0): UserStats {
   return {
     totalPoints: points,
     calcCount: calcs,
     challengeCount: challenges,
     badgesCount: badges,
-    badges: [
-      {
-        id: 'carbon-conscious',
-        badge_id: 'carbon-conscious',
-        badge_name: 'Carbon Conscious',
-        badge_description: 'Completed your baseline footprint audit',
-        awarded_at: new Date().toISOString()
-      },
-      {
-        id: 'nss-eco-warrior',
-        badge_id: 'nss-eco-warrior',
-        badge_name: 'NSS Eco Warrior',
-        badge_description: 'Active contributor to campus sustainability drives',
-        awarded_at: new Date().toISOString()
-      },
-      {
-        id: 'plastic-free',
-        badge_id: 'plastic-free',
-        badge_name: 'Plastic Free Pioneer',
-        badge_description: 'Avoided single-use plastics for 7 consecutive days',
-        awarded_at: new Date().toISOString()
-      }
-    ],
-    latestCalc: {
-      id: 1,
-      user_id: 1,
-      daily_co2_kg: 4.45,
-      monthly_co2_kg: 135.4,
-      annual_co2_tonnes: 1.62,
-      electricity_co2_kg: 68.2,
-      transport_co2_kg: 32.5,
-      food_co2_kg: 24.1,
-      plastic_co2_kg: 4.2,
-      waste_co2_kg: 3.1,
-      lifestyle_co2_kg: 3.3,
-      inputs: {} as any,
-      calculated_at: new Date().toISOString()
-    }
+    badges: [],
+    latestCalc: null
   };
 }
 
@@ -97,7 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (parsed.role === 'admin' || localStorage.getItem('cc_admin_token')) {
             setIsAdmin(true);
           }
-          setStats(createDefaultStats(210, 3, 5, 3));
+          setStats(createDefaultStats(0, 0, 0, 0));
         } catch {
           setUser(null);
           setStats(null);
@@ -133,7 +97,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAdmin(true);
       localStorage.setItem('cc_admin_token', res.token);
     }
-    setStats(createDefaultStats(210, 3, 5, 3));
+    setStats(createDefaultStats(0, 0, 0, 0));
+    refreshUser();
   };
 
   const register = async (userData: any) => {
@@ -141,7 +106,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('cc_token', res.token);
     localStorage.setItem('cc_current_user', JSON.stringify(res.user));
     setUser(res.user);
-    setStats(createDefaultStats(50, 0, 0, 1));
+    setStats(createDefaultStats(0, 0, 0, 0));
+    refreshUser();
   };
 
   const googleLogin = async (payload: any) => {
@@ -149,7 +115,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('cc_token', res.token);
     localStorage.setItem('cc_current_user', JSON.stringify(res.user));
     setUser(res.user);
-    setStats(createDefaultStats(100, 1, 2, 2));
+    setStats(createDefaultStats(0, 0, 0, 0));
+    refreshUser();
     return { needsProfileCompletion: res.needsProfileCompletion };
   };
 
@@ -160,7 +127,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('cc_current_user', JSON.stringify(res.admin));
     setIsAdmin(true);
     setUser(res.admin);
-    setStats(createDefaultStats(2450, 388, 15, 5));
+    setStats(createDefaultStats(0, 0, 0, 0));
+    refreshUser();
   };
 
   const logout = () => {
