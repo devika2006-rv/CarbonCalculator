@@ -101,6 +101,42 @@ export interface CalculationRecord {
   calculated_at: string;
 }
 
+export type SubmissionStatus = 'submitted' | 'verifying' | 'verified' | 'needs_review' | 'rejected' | 'failed';
+
+export interface ChallengeSubmission {
+  id: number;
+  userId?: number;
+  userName?: string;
+  userEmail?: string;
+  userCategory?: string;
+  institutionName?: string;
+  district?: string;
+  challengeId: number;
+  challengeTitle?: string;
+  challengeCategory?: string;
+  challengeDifficulty?: string;
+  challengePoints?: number;
+  evidenceGuidance?: string;
+  acceptableEvidence?: string;
+  status: SubmissionStatus;
+  photos: string[];
+  userNotes?: string;
+  evidenceConfirmed?: boolean;
+  aiStatus?: string;
+  aiConfidence?: number | null;
+  aiRelevance?: string;
+  aiQuality?: string;
+  aiReason?: string;
+  reviewerId?: number;
+  reviewerName?: string;
+  reviewDecision?: string;
+  reviewReason?: string;
+  reviewedAt?: string;
+  pointsAwarded: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface Challenge {
   id: number;
   slug: string;
@@ -112,8 +148,19 @@ export interface Challenge {
   points: number;
   action_steps: string;
   badge_award?: string;
+  evidence_guidance?: string;
+  acceptable_evidence?: string;
+  recommended_photos?: number;
+  privacy_guidance?: string;
   completedCurrentPeriod?: boolean;
   totalTimesCompleted?: number;
+  latestSubmission?: {
+    id: number;
+    status: SubmissionStatus;
+    createdAt: string;
+    aiReason?: string;
+    reviewReason?: string;
+  } | null;
 }
 
 export interface Badge {

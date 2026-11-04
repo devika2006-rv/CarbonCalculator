@@ -11,7 +11,8 @@ import {
   User as UserIcon,
   CheckCircle2,
   PieChart as PieIcon,
-  BarChart3
+  BarChart3,
+  Camera
 } from 'lucide-react';
 import {
   PieChart,
@@ -48,6 +49,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setActiveTab }) =>
   const { user, stats, refreshUser } = useAuth();
   const [history, setHistory] = useState<CalculationRecord[]>([]);
   const [challengeHistory, setChallengeHistory] = useState<any[]>([]);
+  const [pendingSubmissionsCount, setPendingSubmissionsCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -55,6 +57,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setActiveTab }) =>
       Promise.all([
         api.calculator.getHistory().then(res => setHistory(res.history)),
         api.challenges.getUserHistory().then(res => setChallengeHistory(res.history)),
+        api.challenges.getSubmissions().then(res => {
+          const pending = (res.submissions || []).filter((s: any) => s.status === 'needs_review' || s.status === 'verifying').length;
+          setPendingSubmissionsCount(pending);
+        }),
         refreshUser()
       ]).finally(() => setLoading(false));
     } else {
@@ -145,6 +151,24 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setActiveTab }) =>
           </div>
         </div>
       </div>
+
+      {/* Pending Challenge Proofs Notification */}
+      {pendingSubmissionsCount > 0 && (
+        <div className="p-4 bg-amber-50 border border-amber-200/90 rounded-2xl flex items-center justify-between text-left text-xs sm:text-sm">
+          <div className="flex items-center gap-2.5 text-amber-900 font-semibold">
+            <Camera className="w-5 h-5 text-amber-600 flex-shrink-0" />
+            <span>
+              You have <strong>{pendingSubmissionsCount} challenge photo proof{pendingSubmissionsCount > 1 ? 's' : ''}</strong> currently under review.
+            </span>
+          </div>
+          <button
+            onClick={() => setActiveTab('challenges')}
+            className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition-colors shadow-xs"
+          >
+            View Status
+          </button>
+        </div>
+      )}
 
       {/* Main Stats or Empty State */}
       {!latest ? (

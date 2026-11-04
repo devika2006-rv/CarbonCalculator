@@ -25,8 +25,15 @@ import {
   Clock,
   UserCheck,
   UserX,
-  XCircle
+  XCircle,
+  Camera,
+  Check,
+  X,
+  Eye,
+  FileCheck2,
+  Sparkles
 } from 'lucide-react';
+import { ChallengeSubmission } from '../types';
 import {
   LineChart,
   Line,
@@ -54,11 +61,21 @@ export const AdminPage: React.FC<AdminPageProps> = ({ setActiveTab }) => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Active Admin Sub-Tab
-  const [adminTab, setAdminTab] = useState<'overview' | 'users' | 'analytics' | 'enquiries' | 'exports'>('overview');
+  const [adminTab, setAdminTab] = useState<'overview' | 'verifications' | 'users' | 'analytics' | 'enquiries' | 'exports'>('overview');
 
   // Overview data
   const [overview, setOverview] = useState<any>(null);
   const [loadingOverview, setLoadingOverview] = useState(false);
+
+  // Verifications State (Photo proof audit)
+  const [submissionsList, setSubmissionsList] = useState<ChallengeSubmission[]>([]);
+  const [submissionCounts, setSubmissionCounts] = useState({ total: 0, needsReview: 0, verified: 0, rejected: 0 });
+  const [submissionStatusFilter, setSubmissionStatusFilter] = useState<'all' | 'needs_review' | 'verified' | 'rejected'>('needs_review');
+  const [loadingSubmissions, setLoadingSubmissions] = useState(false);
+  const [selectedProofForModal, setSelectedProofForModal] = useState<string | null>(null);
+  const [reviewDialog, setReviewDialog] = useState<{ submission: ChallengeSubmission; action: 'approve' | 'reject'; reason: string } | null>(null);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [reviewSuccessMsg, setReviewSuccessMsg] = useState<string | null>(null);
 
   // Users Management state
   const [usersList, setUsersList] = useState<any[]>([]);
@@ -96,6 +113,38 @@ export const AdminPage: React.FC<AdminPageProps> = ({ setActiveTab }) => {
       setConnectionStatus('local');
     } finally {
       setLoadingOverview(false);
+    }
+  };
+
+  // Load Submissions Data
+  const loadSubmissions = async (status = submissionStatusFilter) => {
+    try {
+      setLoadingSubmissions(true);
+      const res = await api.admin.getSubmissions(status);
+      setSubmissionsList(res.submissions || []);
+      setSubmissionCounts(res.counts || { total: 0, needsReview: 0, verified: 0, rejected: 0 });
+    } catch (err) {
+      console.error('Failed to load challenge submissions:', err);
+    } finally {
+      setLoadingSubmissions(false);
+    }
+  };
+
+  // Review submission action (Approve / Reject)
+  const handleReviewAction = async () => {
+    if (!reviewDialog) return;
+    try {
+      setIsSubmittingReview(true);
+      const res = await api.admin.reviewSubmission(reviewDialog.submission.id, reviewDialog.action, reviewDialog.reason);
+      setReviewSuccessMsg(res.message);
+      setReviewDialog(null);
+      await loadSubmissions(submissionStatusFilter);
+      await loadOverview();
+      setTimeout(() => setReviewSuccessMsg(null), 4000);
+    } catch (err: any) {
+      alert(`Review error: ${err.message || 'Failed to submit review'}`);
+    } finally {
+      setIsSubmittingReview(false);
     }
   };
 
@@ -151,9 +200,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({ setActiveTab }) => {
     setIsRefreshing(true);
     try {
       if (adminTab === 'overview') await loadOverview();
+      else if (adminTab === 'verifications') await loadSubmissions(submissionStatusFilter);
       else if (adminTab === 'users') await loadUsers(pagination.page);
       else if (adminTab === 'analytics') await loadAnalytics();
       else if (adminTab === 'enquiries') await loadEnquiries();
+      // Always refresh badge count
+      const countsRes = await api.admin.getSubmissions('all', 1, 1).catch(() => null);
+      if (countsRes?.counts) setSubmissionCounts(countsRes.counts);
       setLastUpdated(new Date());
     } finally {
       setIsRefreshing(false);
@@ -163,11 +216,17 @@ export const AdminPage: React.FC<AdminPageProps> = ({ setActiveTab }) => {
   useEffect(() => {
     if (isAdmin) {
       if (adminTab === 'overview') loadOverview();
+      else if (adminTab === 'verifications') loadSubmissions(submissionStatusFilter);
       else if (adminTab === 'users') loadUsers(pagination.page);
       else if (adminTab === 'analytics') loadAnalytics();
       else if (adminTab === 'enquiries') loadEnquiries();
+
+      // Keep badge updated
+      api.admin.getSubmissions('all', 1, 1).then(res => {
+        if (res?.counts) setSubmissionCounts(res.counts);
+      }).catch(() => {});
     }
-  }, [isAdmin, adminTab]);
+  }, [isAdmin, adminTab, submissionStatusFilter]);
 
   const handleAdminLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -414,6 +473,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ setActiveTab }) => {
       <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-slate-200">
         {[
           { id: 'overview', label: 'Platform Overview', icon: TrendingUp },
+          { id: 'verifications', label: 'Challenge Proof Reviews', icon: Camera, badge: submissionCounts.needsReview },
           { id: 'users', label: 'User Directory', icon: Users },
           { id: 'analytics', label: 'Usage Analytics', icon: Calculator },
           { id: 'enquiries', label: 'Contact Messages', icon: Mail },
@@ -425,7 +485,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ setActiveTab }) => {
             <button
               key={tab.id}
               onClick={() => setAdminTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all relative ${
                 isActive
                   ? 'bg-slate-900 text-white shadow-xs'
                   : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -433,6 +493,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({ setActiveTab }) => {
             >
               <Icon className="w-4 h-4" />
               <span>{tab.label}</span>
+              {tab.badge !== undefined && tab.badge > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-extrabold animate-pulse">
+                  {tab.badge}
+                </span>
+              )}
             </button>
           );
         })}
@@ -614,6 +679,243 @@ export const AdminPage: React.FC<AdminPageProps> = ({ setActiveTab }) => {
           ) : (
             <div className="p-12 text-center text-slate-500 bg-white rounded-3xl border border-slate-200">
               Unable to load overview. Click "Refresh" to try again.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SUB-TAB: CHALLENGE PROOF VERIFICATION REVIEW */}
+      {adminTab === 'verifications' && (
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+            <div>
+              <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
+                <Camera className="w-5 h-5 text-emerald-600" />
+                Challenge Photo Evidence Verification Review
+              </h3>
+              <p className="text-xs text-slate-500">
+                Audit student & volunteer photo evidence, review Gemini AI vision scores, inspect full-resolution proofs, and grant Green Points.
+              </p>
+            </div>
+
+            {/* Status Filter Buttons */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {[
+                { id: 'needs_review', label: 'Pending Review', count: submissionCounts.needsReview, color: 'bg-amber-100 text-amber-800 border-amber-200' },
+                { id: 'verified', label: 'Verified', count: submissionCounts.verified, color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+                { id: 'rejected', label: 'Rejected', count: submissionCounts.rejected, color: 'bg-rose-100 text-rose-800 border-rose-200' },
+                { id: 'all', label: 'All Submissions', count: submissionCounts.total, color: 'bg-slate-100 text-slate-800 border-slate-200' },
+              ].map((pill) => (
+                <button
+                  key={pill.id}
+                  onClick={() => {
+                    setSubmissionStatusFilter(pill.id as any);
+                    loadSubmissions(pill.id as any);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
+                    submissionStatusFilter === pill.id
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-50 border-slate-200'
+                  }`}
+                >
+                  <span>{pill.label}</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${submissionStatusFilter === pill.id ? 'bg-white/20 text-white' : pill.color}`}>
+                    {pill.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Action Success Alert */}
+          {reviewSuccessMsg && (
+            <div className="p-4 bg-emerald-600 text-white rounded-2xl flex items-center justify-between text-xs font-bold shadow-md">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-200" />
+                <span>{reviewSuccessMsg}</span>
+              </div>
+              <button onClick={() => setReviewSuccessMsg(null)} className="text-white/80 hover:text-white">
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {/* Submissions List */}
+          {loadingSubmissions ? (
+            <div className="p-12 text-center text-slate-500">
+              <RefreshCw className="w-6 h-6 animate-spin mx-auto text-emerald-600 mb-2" />
+              <p className="text-sm font-medium">Fetching challenge evidence records...</p>
+            </div>
+          ) : submissionsList.length === 0 ? (
+            <div className="p-12 text-center space-y-3">
+              <FileCheck2 className="w-12 h-12 text-slate-300 mx-auto" />
+              <p className="text-sm font-bold text-slate-700">No submissions found in this category</p>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                {submissionStatusFilter === 'needs_review'
+                  ? 'All submitted photo proofs have been reviewed! New submissions will appear here automatically.'
+                  : 'No submissions match the current status filter.'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {submissionsList.map((sub) => {
+                const isPending = sub.status === 'needs_review' || sub.status === 'verifying';
+                const isVerified = sub.status === 'verified';
+
+                return (
+                  <div
+                    key={sub.id}
+                    className={`p-6 rounded-3xl border transition-all space-y-4 ${
+                      isPending
+                        ? 'border-amber-300 bg-amber-50/20 shadow-xs'
+                        : isVerified
+                        ? 'border-emerald-200 bg-emerald-50/10'
+                        : 'border-rose-200 bg-rose-50/10'
+                    }`}
+                  >
+                    {/* Top Row: User details & Challenge badge */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-slate-900 text-sm">{sub.userName || 'Participant'}</span>
+                          <span className="text-xs text-slate-400">({sub.userEmail})</span>
+                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-semibold">
+                            {sub.userCategory || 'Student'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {sub.institutionName || 'Independent'} • {sub.district || 'Kerala'} • Submitted on {new Date(sub.createdAt).toLocaleDateString()} at {new Date(sub.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 text-xs">
+                          +{sub.challengePoints || 20} Points
+                        </span>
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                            isVerified
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                              : isPending
+                              ? 'bg-amber-100 text-amber-800 border-amber-300'
+                              : 'bg-rose-100 text-rose-800 border-rose-300'
+                          }`}
+                        >
+                          {isVerified ? 'Verified' : isPending ? 'Pending Review' : 'Rejected'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Challenge Title & Evidence Requirement */}
+                    <div className="space-y-1">
+                      <h4 className="font-bold text-slate-900 text-base">
+                        {sub.challengeTitle}
+                      </h4>
+                      <p className="text-xs text-slate-600">
+                        <span className="font-semibold text-slate-700">Requirement:</span> {sub.evidenceGuidance || 'Direct photo evidence of sustainable action.'}
+                      </p>
+                      {sub.userNotes && (
+                        <p className="text-xs text-slate-600 italic bg-white p-2.5 rounded-xl border border-slate-200 inline-block mt-1">
+                          "{sub.userNotes}"
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Photos Preview & AI Assessment Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                      {/* Photo Evidence Thumbnails */}
+                      <div className="space-y-1.5">
+                        <span className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
+                          Submitted Photo Evidence ({sub.photos.length})
+                        </span>
+                        <div className="flex items-center gap-3">
+                          {sub.photos.map((photo, pIdx) => {
+                            const photoUrl = api.challenges.getProofUrl(photo);
+                            return (
+                              <button
+                                key={pIdx}
+                                onClick={() => setSelectedProofForModal(photoUrl)}
+                                className="relative group w-32 h-24 rounded-2xl overflow-hidden border border-slate-300 bg-slate-100 shadow-xs focus:ring-2 focus:ring-emerald-500"
+                                title="Click to enlarge full resolution evidence"
+                              >
+                                <img
+                                  src={photoUrl}
+                                  alt={`Proof ${pIdx + 1}`}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                  onError={(e) => {
+                                    (e.target as HTMLElement).style.display = 'none';
+                                  }}
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1">
+                                  <Eye className="w-4 h-4" />
+                                  <span>View</span>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* AI Vision Assessment Box */}
+                      <div className="p-3.5 bg-white rounded-2xl border border-slate-200/90 text-xs space-y-2">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                          <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                            AI Vision Assessment
+                          </span>
+                          {sub.aiConfidence !== null && (
+                            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold text-[10px]">
+                              {sub.aiConfidence}% Confidence
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="space-y-1 text-slate-600">
+                          <div>
+                            <span className="font-semibold text-slate-800">Relevance:</span> {sub.aiRelevance || 'Unknown'} • <span className="font-semibold text-slate-800">Quality:</span> {sub.aiQuality || 'Clear'}
+                          </div>
+                          <div>
+                            <span className="font-semibold text-slate-800">AI Reasoning:</span> {sub.aiReason || 'Evidence evaluated against challenge criteria.'}
+                          </div>
+                        </div>
+
+                        {sub.reviewerName && (
+                          <div className="pt-1.5 border-t border-slate-100 text-[11px] text-slate-500">
+                            Reviewed by <strong>{sub.reviewerName}</strong> on {sub.reviewedAt ? new Date(sub.reviewedAt).toLocaleDateString() : 'N/A'}: "{sub.reviewReason}"
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Action Buttons for Coordinators */}
+                    <div className="pt-2 border-t border-slate-200/80 flex items-center justify-end gap-3">
+                      <button
+                        onClick={() => setReviewDialog({
+                          submission: sub,
+                          action: 'reject',
+                          reason: 'Evidence does not clearly meet the required criteria or photo is too blurry.'
+                        })}
+                        className="px-4 py-2 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-700 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Reject / Request Resubmission</span>
+                      </button>
+
+                      <button
+                        onClick={() => setReviewDialog({
+                          submission: sub,
+                          action: 'approve',
+                          reason: 'Evidence accepted by institution coordinator'
+                        })}
+                        className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Approve & Award Points</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -1138,6 +1440,106 @@ export const AdminPage: React.FC<AdminPageProps> = ({ setActiveTab }) => {
                   <span>Download Full JSON Dump</span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 1: HIGH-RES EVIDENCE PHOTO INSPECTION */}
+      {selectedProofForModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="relative max-w-3xl w-full max-h-[85vh] flex flex-col items-center">
+            <button
+              onClick={() => setSelectedProofForModal(null)}
+              className="absolute -top-10 right-0 text-white/80 hover:text-white p-1"
+            >
+              <X className="w-7 h-7" />
+            </button>
+            <img
+              src={selectedProofForModal}
+              alt="Enlarged Evidence Proof"
+              className="max-h-[80vh] w-auto rounded-2xl object-contain shadow-2xl border border-white/20"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: COORDINATOR REVIEW DECISION DIALOG */}
+      {reviewDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl border border-slate-100 text-left">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
+                {reviewDialog.action === 'approve' ? (
+                  <>
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    <span>Approve Evidence & Award Points</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="w-5 h-5 text-rose-600" />
+                    <span>Reject or Request Resubmission</span>
+                  </>
+                )}
+              </h3>
+              <button
+                onClick={() => setReviewDialog(null)}
+                disabled={isSubmittingReview}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs space-y-1 text-slate-700">
+              <p>
+                <strong>Participant:</strong> {reviewDialog.submission.userName} ({reviewDialog.submission.userEmail})
+              </p>
+              <p>
+                <strong>Challenge:</strong> {reviewDialog.submission.challengeTitle} (+{reviewDialog.submission.challengePoints || 20} pts)
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide">
+                Coordinator Feedback / Review Notes
+              </label>
+              <textarea
+                rows={3}
+                value={reviewDialog.reason}
+                onChange={(e) => setReviewDialog({ ...reviewDialog, reason: e.target.value })}
+                disabled={isSubmittingReview}
+                placeholder="Enter feedback or note for the user..."
+                className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 resize-none"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setReviewDialog(null)}
+                disabled={isSubmittingReview}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleReviewAction}
+                disabled={isSubmittingReview}
+                className={`px-5 py-2 rounded-xl text-white font-bold text-xs shadow-md flex items-center gap-2 ${
+                  reviewDialog.action === 'approve'
+                    ? 'bg-emerald-600 hover:bg-emerald-700'
+                    : 'bg-rose-600 hover:bg-rose-700'
+                }`}
+              >
+                {isSubmittingReview ? (
+                  <span>Saving...</span>
+                ) : (
+                  <span>Confirm {reviewDialog.action === 'approve' ? 'Approval' : 'Rejection'}</span>
+                )}
+              </button>
             </div>
           </div>
         </div>

@@ -5,6 +5,7 @@ import {
   CalculationResult,
   CalculationRecord,
   Challenge,
+  ChallengeSubmission,
   EmissionFactor,
   CommunityOverview,
   InstitutionLeaderboardItem
@@ -187,91 +188,163 @@ export function computeClientEmissions(inputs: CalculationInputs): CalculationRe
 const FALLBACK_CHALLENGES: Challenge[] = [
   {
     id: 1,
-    slug: 'phantom-load',
-    title: 'Banish Phantom Loads',
-    category: 'daily',
+    slug: 'switch-off-standby',
+    title: 'Banish Phantom Loads: Unplug Unused Chargers & Standby Devices',
+    description: 'Vampire power from plugged-in laptop chargers, TV boxes, and microwave standby displays consumes 5-10% of household electricity without doing any useful work.',
+    environmental_benefit: 'Saves 0.3 - 0.7 kWh of electricity per day and prevents ~0.5 kg CO2e grid emissions.',
     difficulty: 'Easy',
-    description: 'Switch off power strips, laptop chargers, and set-top boxes at the wall switch before sleeping.',
-    environmental_benefit: 'Prevents 0.8 kg CO2e emissions nightly from vampire standby power consumption.',
-    action_steps: 'Inspect living room and study desks before bed. Turn off main power outlets for all unused electronics.',
-    points: 30
+    category: 'daily',
+    points: 15,
+    action_steps: 'Inspect your bedroom/study desk; switch off power strips and unplug phone/laptop chargers when not actively charging.',
+    badge_award: 'energy_saver',
+    evidence_guidance: 'Submit a photo clearly showing switched-off power strips, unplugged laptop/phone chargers, or appliances disconnected at the wall outlet.',
+    acceptable_evidence: 'Power strip switch in the OFF position, unplugged charging bricks on a desk, or TV entertainment unit with wall switch toggled off.',
+    recommended_photos: 1,
+    privacy_guidance: 'Do not include computer screens displaying confidential personal emails, passwords, or identification documents.'
   },
   {
     id: 2,
-    slug: 'zero-single-use',
-    title: 'Zero Single-Use Day',
-    category: 'daily',
+    slug: 'reusable-water-bottle',
+    title: 'Carry a Reusable Water Bottle: Zero Single-Use Plastic Today',
+    description: 'Single-use PET bottles generate immense fossil fuel refining emissions and break down into microplastics that pollute rivers and marine ecosystems.',
+    environmental_benefit: 'Eliminates 2-3 single-use plastic bottles, saving ~150g of plastic waste and 0.4 kg CO2e.',
     difficulty: 'Easy',
-    description: 'Carry a reusable metal bottle and cotton tote bag. Refuse all single-use plastic cups, straws, and polybags today.',
-    environmental_benefit: 'Stops petrochemical packaging waste and saves approximately 0.25 kg CO2e.',
-    action_steps: 'Pack your stainless steel water container and cloth bag before leaving campus/home.',
-    points: 40
+    category: 'daily',
+    points: 20,
+    action_steps: 'Fill your personal steel, copper, or reusable bottle before heading to college, school, or work. Refill at campus water points.',
+    badge_award: 'plastic_free_pioneer',
+    evidence_guidance: 'Submit a photo of your reusable water bottle (stainless steel, copper, glass, or durable BPA-free plastic) being carried or refilled for daily use.',
+    acceptable_evidence: 'Personal reusable bottle beside study/work desk, refilling at campus water dispenser, or reusable cloth/jute shopping bag.',
+    recommended_photos: 1,
+    privacy_guidance: 'Focus the photo on the reusable bottle or bag; do not include close-up faces or personal ID cards.'
   },
   {
     id: 3,
-    slug: 'transit-power',
-    title: 'Public Transit or Pedal Power',
-    category: 'daily',
+    slug: 'active-mobility-or-bus',
+    title: 'Sustainable Commute: Walk, Cycle, or Ride Public Transit',
+    description: 'Short car and solo scooter rides produce the highest per-passenger emission rates. Taking public buses, trains, or walking promotes cleaner air.',
+    environmental_benefit: 'Replaces ~5-10 km of solo motorcycle or car ride, saving 0.4 - 1.2 kg CO2e.',
     difficulty: 'Medium',
-    description: 'Commute to campus or work via KSRTC bus, train, bicycle, or walking instead of private two-wheeler/car.',
-    environmental_benefit: 'Saves 2.4 kg CO2e per 20 km daily round trip compared to solo petrol vehicles.',
-    action_steps: 'Check local bus/train timings or carpool with classmates for your morning commute.',
-    points: 60
+    category: 'daily',
+    points: 25,
+    action_steps: 'Choose public bus/train for your daily commute or walk/cycle for local neighborhood errands within 1.5 km.',
+    badge_award: 'green_commuter',
+    evidence_guidance: 'Submit safe evidence of sustainable commuting: your bicycle parked at campus/destination, a valid public bus or train ticket, or a daily step-counter summary.',
+    acceptable_evidence: 'Bicycle parked in a rack, public transit ticket/pass, suburban train platform/carriage, or fitness step-count screenshot (5,000+ steps).',
+    recommended_photos: 1,
+    privacy_guidance: 'SAFETY FIRST: Never take photos while actively riding a bicycle or operating any vehicle. Blur or crop any passenger faces or private ticket barcode details.'
   },
   {
     id: 4,
-    slug: 'plant-feast',
-    title: 'Plant-Powered Feast',
-    category: 'daily',
+    slug: 'zero-food-plate-waste',
+    title: 'Clean Plate Club: Zero Food Wastage Across All Meals',
+    description: 'Wasted food represents wasted irrigation water, fertilizers, diesel transportation, and anaerobic methane emissions in municipal dump yards.',
+    environmental_benefit: 'Prevents 300g of wasted organic matter and avoids ~0.8 kg CO2e embedded agricultural footprint.',
     difficulty: 'Easy',
-    description: 'Enjoy delicious vegetarian or plant-based meals throughout the day without animal meat.',
-    environmental_benefit: 'Cuts dietary carbon intensity by 50%, eliminating ~3.5 kg CO2e daily.',
-    action_steps: 'Choose seasonal vegetables, lentils (dal), and pulses for lunch and dinner.',
-    points: 45
+    category: 'daily',
+    points: 20,
+    action_steps: 'Take sensible portion sizes during breakfast, lunch, and dinner. Finish everything on your plate or pack leftovers safely.',
+    badge_award: 'mindful_eater',
+    evidence_guidance: 'Submit a photo of your clean dining plate or tiffin box after completing your meal, showing zero edible food discarded.',
+    acceptable_evidence: 'Empty dining plate or college mess tiffin box with zero leftover food, or safely packaged meal portions stored in reusable containers.',
+    recommended_photos: 1,
+    privacy_guidance: 'Frame photo strictly on the dining plate or tiffin container.'
   },
   {
     id: 5,
-    slug: 'waste-segregation',
-    title: 'Household Waste Segregation',
-    category: 'weekly',
+    slug: 'household-source-segregation',
+    title: 'Source Segregation: Separate Wet Kitchen & Dry Recyclable Waste',
+    description: 'Unsegregated waste rots in open dumpsites releasing methane. Segregating at home enables decentralized composting and high-value dry recycling.',
+    environmental_benefit: 'Diverts 1.5 kg of waste from open dumping, supporting Haritha Karma Sena / municipal recycling.',
     difficulty: 'Medium',
-    description: 'Ensure wet organic food waste is separated from dry recyclable plastics, paper, and clean glass at the source.',
-    environmental_benefit: 'Prevents landfill methane decomposition and facilitates material circularity.',
-    action_steps: 'Set up two distinct bins: green for wet biodegradable kitchen waste, blue for dry clean recyclables.',
-    points: 35
+    category: 'daily',
+    points: 25,
+    action_steps: 'Maintain two separate bins at home: Green for organic peels/food scraps, Blue for clean dry paper, plastic, and cardboard.',
+    badge_award: 'waste_warrior',
+    evidence_guidance: 'Submit a photo showing segregated waste collection bins: separated wet biodegradable kitchen waste and clean dry recyclables.',
+    acceptable_evidence: 'Two distinct bins (green for organic kitchen peels and blue for dry paper/plastics), or segregated bags prepared for municipal Haritha Karma Sena collection.',
+    recommended_photos: 1,
+    privacy_guidance: 'Do not photograph addressed postal envelopes, bank statements, or utility bills containing private addresses.'
   },
   {
     id: 6,
-    slug: 'ac-eco-mode',
-    title: 'AC Eco Temperature Mode (24°C+)',
+    slug: 'natural-ventilation-day',
+    title: 'Fresh Air Hours: Cool with Natural Breeze & Fans Instead of AC',
+    description: 'Air conditioners are the largest electricity consumers in modern homes. Using natural cross-ventilation during morning and evening slashes load.',
+    environmental_benefit: 'Saves 3-6 kWh of cooling power, averting 2.2 - 4.3 kg CO2e in hot seasons.',
+    difficulty: 'Medium',
     category: 'daily',
-    difficulty: 'Easy',
-    description: 'Operate cooling fans and air conditioners at 24°C or above. Every 1°C elevation saves approximately 6% power.',
-    environmental_benefit: 'Reduces peak summer electricity demand and cuts 1.8 kg CO2e daily.',
-    action_steps: 'Set AC thermostat to 24°C and keep ceiling fan on low circulation mode.',
-    points: 40
+    points: 25,
+    action_steps: 'Open windows for cross breeze during pleasant hours, set ceiling fan to comfortable speeds, and keep AC off.',
+    badge_award: 'cool_conserver',
+    evidence_guidance: 'Submit a photo showing an open window allowing natural breeze and daylight, with ceiling fan in operation and AC turned off.',
+    acceptable_evidence: 'Room window opened for natural ventilation with ceiling fan running, AC wall switch in OFF position, or AC remote set to 24°C+ Eco Mode.',
+    recommended_photos: 1,
+    privacy_guidance: 'Keep photo framed towards the window, fan, or switchboard. Avoid capturing personal living space clutter.'
   },
   {
     id: 7,
-    slug: 'clean-plate',
-    title: 'Clean Plate Challenge',
-    category: 'daily',
-    difficulty: 'Easy',
-    description: 'Take only what you need and leave zero edible food waste on your plate at all meals.',
-    environmental_benefit: 'Directly conserves agricultural energy, water, and transport emissions.',
-    action_steps: 'Serve smaller portions first; take second helpings only if needed.',
-    points: 30
+    slug: 'room-energy-audit-weekly',
+    title: 'Weekly 10-Minute Energy Audit: Campus Classroom or Home',
+    description: 'NSS volunteers and students inspect unoccupied classrooms, corridors, labs, or rooms at home to turn off unnecessary lights and humming fans.',
+    environmental_benefit: 'Identifies faulty appliances and prevents 5+ kWh of wasteful classroom/household idle electricity.',
+    difficulty: 'Medium',
+    category: 'weekly',
+    points: 35,
+    action_steps: 'Walk through your department, floor, or home. Switch off idle lighting/fans. Check if refrigerator door gaskets seal tightly.',
+    badge_award: 'nss_energy_auditor',
+    evidence_guidance: 'Submit a photo of an unoccupied classroom, lab, or home room with all light switches and fan controls switched off.',
+    acceptable_evidence: 'Vacant classroom or study room with switched-off lighting board, or inspected power distribution board with idle circuits turned off.',
+    recommended_photos: 1,
+    privacy_guidance: 'Ensure no students or colleagues are inadvertently included in the photo without their consent.'
   },
   {
     id: 8,
-    slug: 'campus-cleanup',
-    title: 'Campus / Neighborhood Clean-Up',
+    slug: 'spread-sustainability-word',
+    title: 'Peer Awareness: Explain Carbon Footprint to a Friend or Family',
+    description: 'Individual action multiplies when shared. Introducing one peer, family member, or classmate to CarbonCalculator triggers widespread community habit changes.',
+    environmental_benefit: 'Creates ripple awareness, inspiring peers to calculate their baseline emissions and join green challenges.',
+    difficulty: 'Easy',
     category: 'weekly',
+    points: 30,
+    action_steps: 'Show the CarbonCalculator platform to a classmate or family member and guide them through their first footprint estimation.',
+    badge_award: 'eco_advocate',
+    evidence_guidance: 'Submit a photo of the CarbonCalculator website open on a screen while sharing it with a peer, or educational notes from an awareness discussion.',
+    acceptable_evidence: 'CarbonCalculator footprint result screen being shown on a laptop/phone, or a brief NSS group discussion on carbon reduction.',
+    recommended_photos: 1,
+    privacy_guidance: 'Focus the photo on the screen or educational chart. Do not capture identifiable portraits of friends without consent.'
+  },
+  {
+    id: 9,
+    slug: 'decentralized-composting',
+    title: 'Home Composting: Divert Kitchen Scraps to Bio-Bin or Garden',
+    description: 'Organic kitchen waste rich in nitrogen and moisture turns into nutrient-dense humus when aerobically composted instead of releasing landfill methane.',
+    environmental_benefit: 'Permanently eliminates methane emission from 5 kg of household organic waste per week.',
     difficulty: 'Hard',
-    description: 'Dedicate 45 minutes with peers to collect and responsibly segregate discarded plastics around your locality.',
-    environmental_benefit: 'Protects local waterways and yields 80 Green Action Points.',
-    action_steps: 'Organize a quick 3-person team with gloves and bags to clean a 200m stretch.',
-    points: 80
+    category: 'weekly',
+    points: 40,
+    action_steps: 'Deposit kitchen vegetable cuttings, coffee grounds, and dry leaves into a home pipe-compost, bio-bin, or garden mulch bed.',
+    badge_award: 'earth_restorer',
+    evidence_guidance: 'Submit a photo of your household pipe-compost unit, bio-bin, vermicompost bin, or organic kitchen scraps added to garden mulch.',
+    acceptable_evidence: 'Compost bin with vegetable peel deposits, home aerated bio-bin, or nutrient-rich finished compost being applied to plants.',
+    recommended_photos: 1,
+    privacy_guidance: 'Focus on the composting receptacle or garden bed.'
+  },
+  {
+    id: 10,
+    slug: 'sapling-care-or-greenery',
+    title: 'Nurture Nature: Plant or Care for Native Trees & Campus Greenery',
+    description: 'Trees act as natural carbon sinks, sequestering atmospheric CO2, providing shade cooling, improving soil water retention, and supporting biodiversity.',
+    environmental_benefit: 'A mature tree absorbs ~20-22 kg of CO2 per year over its lifetime.',
+    difficulty: 'Medium',
+    category: 'weekly',
+    points: 35,
+    action_steps: 'Water campus saplings, tend your home balcony plants, or plant a native fruit/shade sapling in your community.',
+    badge_award: 'green_guardian',
+    evidence_guidance: 'Submit a photo of planting a native sapling, watering campus trees, or tending potted balcony plants.',
+    acceptable_evidence: 'Freshly planted or watered tree sapling, tending home balcony medicinal/flowering plants, or mulching young plants.',
+    recommended_photos: 1,
+    privacy_guidance: 'Focus on the plant, soil, and watering can or gardening tools.'
   }
 ];
 
@@ -551,8 +624,137 @@ export const api = {
       try {
         return await request<{ challenges: Challenge[] }>('/challenges');
       } catch {
-        return { challenges: FALLBACK_CHALLENGES };
+        const completed: number[] = JSON.parse(localStorage.getItem('cc_completed_challenges') || '[]');
+        const submissions: ChallengeSubmission[] = JSON.parse(localStorage.getItem('cc_submissions') || '[]');
+        const enhanced = FALLBACK_CHALLENGES.map(c => {
+          const isDone = completed.includes(c.id);
+          const sub = submissions.find(s => s.challengeId === c.id);
+          return {
+            ...c,
+            completedCurrentPeriod: isDone,
+            totalTimesCompleted: isDone ? 1 : 0,
+            latestSubmission: sub ? {
+              id: sub.id,
+              status: sub.status,
+              createdAt: sub.createdAt,
+              aiReason: sub.aiReason,
+              reviewReason: sub.reviewReason
+            } : null
+          };
+        });
+        return { challenges: enhanced };
       }
+    },
+
+    submitProof: async (id: number, formData: FormData) => {
+      try {
+        const headers = { ...getAuthHeader() };
+        const response = await fetch(`${API_BASE}/challenges/${id}/submit`, {
+          method: 'POST',
+          headers,
+          body: formData,
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || `HTTP error ${response.status}`);
+        }
+        return data as {
+          status: 'verified' | 'needs_review' | 'rejected';
+          message: string;
+          pointsEarned: number;
+          totalPoints?: number;
+          newBadges?: any[];
+          submissionId: number;
+          aiFeedback?: { confidence?: number; reason?: string; description?: string };
+        };
+      } catch (err: any) {
+        // Fallback simulation for offline/static deployment
+        const userNotes = String(formData.get('notes') || '');
+        const files = formData.getAll('photos') as File[];
+        const challenge = FALLBACK_CHALLENGES.find(c => c.id === id) || FALLBACK_CHALLENGES[0];
+        
+        // Read file previews
+        const previewUrls: string[] = [];
+        for (const file of files) {
+          if (file instanceof File) {
+            try {
+              const url = await new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = () => resolve('');
+                reader.readAsDataURL(file);
+              });
+              if (url) previewUrls.push(url);
+            } catch {}
+          }
+        }
+
+        const submissions: ChallengeSubmission[] = JSON.parse(localStorage.getItem('cc_submissions') || '[]');
+        const completed: number[] = JSON.parse(localStorage.getItem('cc_completed_challenges') || '[]');
+
+        const newSub: ChallengeSubmission = {
+          id: Date.now(),
+          challengeId: id,
+          challengeTitle: challenge.title,
+          challengeCategory: challenge.category,
+          challengeDifficulty: challenge.difficulty,
+          challengePoints: challenge.points,
+          evidenceGuidance: challenge.evidence_guidance,
+          acceptableEvidence: challenge.acceptable_evidence,
+          status: 'verified',
+          photos: previewUrls.length > 0 ? previewUrls : ['placeholder_proof.jpg'],
+          userNotes,
+          evidenceConfirmed: true,
+          aiStatus: 'passed',
+          aiConfidence: 89,
+          aiRelevance: 'high',
+          aiQuality: 'clear',
+          aiReason: `Evidence accepted for this challenge. Photo aligns with requirements for "${challenge.title}".`,
+          pointsAwarded: challenge.points,
+          createdAt: new Date().toISOString()
+        };
+
+        submissions.unshift(newSub);
+        localStorage.setItem('cc_submissions', JSON.stringify(submissions));
+
+        if (!completed.includes(id)) {
+          completed.push(id);
+          localStorage.setItem('cc_completed_challenges', JSON.stringify(completed));
+        }
+
+        const totalPoints = completed.length * challenge.points;
+
+        return {
+          status: 'verified' as const,
+          message: `Evidence accepted for this challenge! You earned +${challenge.points} Green Points.`,
+          pointsEarned: challenge.points,
+          totalPoints,
+          newBadges: [],
+          submissionId: newSub.id,
+          aiFeedback: {
+            confidence: 89,
+            reason: `Evidence accepted for this challenge. Photo verified against "${challenge.title}".`,
+            description: 'Photo demonstrates sustainable habits in practice'
+          }
+        };
+      }
+    },
+
+    getSubmissions: async () => {
+      try {
+        return await request<{ submissions: ChallengeSubmission[] }>('/challenges/submissions');
+      } catch {
+        const stored: ChallengeSubmission[] = JSON.parse(localStorage.getItem('cc_submissions') || '[]');
+        return { submissions: stored };
+      }
+    },
+
+    getProofUrl: (filename: string) => {
+      if (filename.startsWith('data:') || filename.startsWith('blob:') || filename.startsWith('http')) {
+        return filename;
+      }
+      return `${API_BASE}/challenges/proof/${filename}`;
     },
 
     complete: async (id: number, notes?: string) => {
@@ -952,6 +1154,64 @@ export const api = {
       } catch {
         const stored = JSON.parse(localStorage.getItem('cc_contact_enquiries') || '[]');
         return { enquiries: stored };
+      }
+    },
+
+    getSubmissions: async (status: string = 'all', page: number = 1, limit: number = 50) => {
+      try {
+        return await request<{
+          submissions: ChallengeSubmission[];
+          counts: { total: number; needsReview: number; verified: number; rejected: number };
+          page: number;
+          limit: number;
+        }>(`/admin/submissions?status=${encodeURIComponent(status)}&page=${page}&limit=${limit}`);
+      } catch {
+        const stored: ChallengeSubmission[] = JSON.parse(localStorage.getItem('cc_submissions') || '[]');
+        let filtered = stored;
+        if (status && status !== 'all') {
+          filtered = stored.filter(s => s.status === status);
+        }
+        const needsReview = stored.filter(s => s.status === 'needs_review').length;
+        const verified = stored.filter(s => s.status === 'verified').length;
+        const rejected = stored.filter(s => s.status === 'rejected').length;
+
+        return {
+          submissions: filtered,
+          counts: {
+            total: stored.length,
+            needsReview,
+            verified,
+            rejected
+          },
+          page,
+          limit
+        };
+      }
+    },
+
+    reviewSubmission: async (id: number, decision: 'approve' | 'reject' | 'resubmission_requested', reason: string = '') => {
+      try {
+        return await request<{ message: string; status: string; pointsAwarded?: number }>(`/admin/submissions/${id}/review`, {
+          method: 'POST',
+          body: JSON.stringify({ decision, reason }),
+        });
+      } catch {
+        const stored: ChallengeSubmission[] = JSON.parse(localStorage.getItem('cc_submissions') || '[]');
+        const sub = stored.find(s => s.id === id);
+        if (sub) {
+          sub.status = decision === 'approve' ? 'verified' : 'rejected';
+          sub.reviewDecision = decision;
+          sub.reviewReason = reason;
+          sub.reviewedAt = new Date().toISOString();
+          if (decision === 'approve') {
+            sub.pointsAwarded = sub.challengePoints || 20;
+          }
+          localStorage.setItem('cc_submissions', JSON.stringify(stored));
+        }
+        return {
+          message: decision === 'approve' ? 'Challenge proof approved successfully' : 'Challenge proof marked as rejected',
+          status: decision === 'approve' ? 'verified' : 'rejected'
+        };
       }
     }
   }

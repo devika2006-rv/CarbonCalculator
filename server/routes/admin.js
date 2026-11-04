@@ -9,6 +9,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import db from '../db.js';
 import { JWT_SECRET, requireAdmin } from '../middleware/auth.js';
+import { checkAndAwardBadges } from './challenges.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -683,6 +684,269 @@ router.get('/export/pdf', requireAdmin, (req, res) => {
   } catch (error) {
     console.error('PDF export error:', error);
     res.status(500).json({ error: 'Failed to generate PDF report' });
+  }
+});
+
+// GET /api/admin/submissions (List photo evidence submissions for review)
+router.get('/submissions', requireAdmin, (req, res) => {
+  try {
+    const { status = 'all', page = 1, limit = 50 } = req.query;
+    const pageNum = Math.max(1, parseInt(page, 10));
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10)));
+    const offset = (pageNum - 1) * limitNum;
+
+    let whereClause = '';
+    const params = [];
+
+    if (status && status !== 'all') {
+      whereClause = 'WHERE cs.status = ?';
+      params.push(status);
+    }
+
+    const query = `
+      SELECT cs.id, cs.user_id, cs.challenge_id, cs.status, cs.image_paths_json,
+             cs.user_notes, cs.evidence_confirmed, cs.ai_status, cs.ai_confidence,
+             cs.ai_relevance, cs.ai_quality, cs.ai_reason, cs.reviewer_id,
+             cs.review_decision, cs.review_reason, cs.reviewed_at, cs.points_awarded,
+             cs.created_at, cs.updated_at,
+             u.name as user_name, u.email as user_email, u.category as user_category,
+             u.institution_name, u.district,
+             c.title as challenge_title, c.category as challenge_category,
+             c.difficulty as challenge_difficulty, c.points as challenge_points,
+             c.evidence_guidance, c.acceptable_evidence,
+             r.name as reviewer_name
+      FROM challenge_submissions cs
+      JOIN users u ON cs.user_id = u.id
+      JOIN challenges c ON cs.challenge_id = c.id
+      LEFT JOIN users r ON cs.reviewer_id = r.id
+      ${whereClause}
+      ORDER BY 
+        CASE WHEN cs.status = 'needs_review' THEN 0 
+             WHEN cs.status = 'verifying' THEN 1
+             WHEN cs.status = 'submitted' THEN 2
+             ELSE 3 END,
+        cs.created_at DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    params.push(limitNum, offset);
+    const submissions = db.prepare(query).all(...params);
+
+    // Count totals by status
+    const counts = db.prepare(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'needs_review' THEN 1 ELSE 0 END) as needs_review,
+        SUM(CASE WHEN status = 'verified' THEN 1 ELSE 0 END) as verified,
+        SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected
+      FROM challenge_submissions
+    `).get();
+
+    const formatted = submissions.map(s => {
+      let photos = [];
+      try {
+        photos = JSON.parse(s.image_paths_json || '[]');
+      } catch {
+        photos = [];
+      }
+      return {
+        id: s.id,
+        userId: s.user_id,
+        userName: s.user_name,
+        userEmail: s.user_email,
+        userCategory: s.user_category,
+        institutionName: s.institution_name,
+        district: s.district,
+        challengeId: s.challenge_id,
+        challengeTitle: s.challenge_title,
+        challengeCategory: s.challenge_category,
+        challengeDifficulty: s.challenge_difficulty,
+        challengePoints: s.challenge_points,
+        evidenceGuidance: s.evidence_guidance,
+        acceptableEvidence: s.acceptable_evidence,
+        status: s.status,
+        photos,
+        userNotes: s.user_notes,
+        evidenceConfirmed: Boolean(s.evidence_confirmed),
+        aiStatus: s.ai_status,
+        aiConfidence: s.ai_confidence ? Math.round(s.ai_confidence * 100) : null,
+        aiRelevance: s.ai_relevance,
+        aiQuality: s.ai_quality,
+        aiReason: s.ai_reason,
+        reviewerId: s.reviewer_id,
+        reviewerName: s.reviewer_name,
+        reviewDecision: s.review_decision,
+        reviewReason: s.review_reason,
+        reviewedAt: s.reviewed_at,
+        pointsAwarded: s.points_awarded,
+        createdAt: s.created_at,
+        updatedAt: s.updated_at
+      };
+    });
+
+    res.json({
+      submissions: formatted,
+      counts: {
+        total: counts.total || 0,
+        needsReview: counts.needs_review || 0,
+        verified: counts.verified || 0,
+        rejected: counts.rejected || 0
+      },
+      page: pageNum,
+      limit: limitNum
+    });
+  } catch (error) {
+    console.error('Fetch admin submissions error:', error);
+    res.status(500).json({ error: 'Failed to retrieve challenge submissions' });
+  }
+});
+
+// POST /api/admin/submissions/:id/review (Coordinator manual review: approve or reject)
+router.post('/submissions/:id/review', requireAdmin, (req, res) => {
+  try {
+    const submissionId = parseInt(req.params.id, 10);
+    const { decision, reason = '' } = req.body;
+
+    if (!['approve', 'reject', 'resubmission_requested'].includes(decision)) {
+      return res.status(400).json({ error: 'Invalid decision. Must be approve, reject, or resubmission_requested.' });
+    }
+
+    const sub = db.prepare(`
+      SELECT cs.*, c.points, c.title, c.badge_award
+      FROM challenge_submissions cs
+      JOIN challenges c ON cs.challenge_id = c.id
+      WHERE cs.id = ?
+    `).get(submissionId);
+
+    if (!sub) {
+      return res.status(404).json({ error: 'Challenge submission not found' });
+    }
+
+    if (decision === 'approve') {
+      if (sub.status === 'verified') {
+        return res.status(400).json({ error: 'This submission has already been approved and verified.' });
+      }
+
+      let newTotalPoints = 0;
+      let newBadges = [];
+
+      const reviewTx = db.transaction(() => {
+        // 1. Update submission
+        db.prepare(`
+          UPDATE challenge_submissions
+          SET status = 'verified',
+              reviewer_id = ?,
+              review_decision = 'approved',
+              review_reason = ?,
+              reviewed_at = CURRENT_TIMESTAMP,
+              points_awarded = ?,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(req.user.id, reason || 'Evidence accepted by institution coordinator', sub.points, submissionId);
+
+        // 2. Insert into user_challenge_completions
+        db.prepare(`
+          INSERT INTO user_challenge_completions (user_id, challenge_id, points_earned, notes)
+          VALUES (?, ?, ?, ?)
+        `).run(sub.user_id, sub.challenge_id, sub.points, sub.user_notes || '');
+
+        // 3. Points Ledger entry
+        db.prepare(`
+          INSERT INTO points_ledger (user_id, challenge_id, submission_id, points, transaction_type, description)
+          VALUES (?, ?, ?, ?, 'challenge_completion', ?)
+        `).run(
+          sub.user_id,
+          sub.challenge_id,
+          submissionId,
+          sub.points,
+          `Coordinator approved: ${sub.title}`
+        );
+
+        // 4. Update user points
+        db.prepare(`
+          INSERT INTO user_points (user_id, total_points, updated_at)
+          VALUES (?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(user_id) DO UPDATE SET
+            total_points = total_points + excluded.total_points,
+            updated_at = CURRENT_TIMESTAMP
+        `).run(sub.user_id, sub.points);
+
+        // 5. Verification audit event
+        db.prepare(`
+          INSERT INTO verification_events (submission_id, event_type, from_status, to_status, reason, metadata_json)
+          VALUES (?, 'manual_approved', ?, 'verified', ?, ?)
+        `).run(
+          submissionId,
+          sub.status,
+          reason || 'Manually approved by institution coordinator',
+          JSON.stringify({ reviewerId: req.user.id })
+        );
+
+        // 6. Review record
+        db.prepare(`
+          INSERT INTO review_records (submission_id, reviewer_id, decision, reason)
+          VALUES (?, ?, 'approved', ?)
+        `).run(submissionId, req.user.id, reason || 'Manually approved');
+      });
+
+      reviewTx();
+
+      newBadges = checkAndAwardBadges(sub.user_id, { title: sub.title, badge_award: sub.badge_award });
+      const pts = db.prepare('SELECT total_points FROM user_points WHERE user_id = ?').get(sub.user_id);
+      newTotalPoints = pts ? pts.total_points : sub.points;
+
+      return res.json({
+        message: `Submission approved successfully. ${sub.points} Green Points credited to user.`,
+        status: 'verified',
+        pointsAwarded: sub.points,
+        newBadges
+      });
+    } else {
+      // Reject or Request Resubmission
+      const finalStatus = 'rejected';
+      const decisionLabel = decision === 'resubmission_requested' ? 'resubmission_requested' : 'rejected';
+
+      const rejectTx = db.transaction(() => {
+        db.prepare(`
+          UPDATE challenge_submissions
+          SET status = ?,
+              reviewer_id = ?,
+              review_decision = ?,
+              review_reason = ?,
+              reviewed_at = CURRENT_TIMESTAMP,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(finalStatus, req.user.id, decisionLabel, reason || 'Evidence insufficient or does not meet requirements', submissionId);
+
+        db.prepare(`
+          INSERT INTO verification_events (submission_id, event_type, from_status, to_status, reason, metadata_json)
+          VALUES (?, 'manual_rejected', ?, 'rejected', ?, ?)
+        `).run(
+          submissionId,
+          sub.status,
+          reason || 'Evidence rejected by coordinator',
+          JSON.stringify({ reviewerId: req.user.id, decision: decisionLabel })
+        );
+
+        db.prepare(`
+          INSERT INTO review_records (submission_id, reviewer_id, decision, reason)
+          VALUES (?, ?, ?, ?)
+        `).run(submissionId, req.user.id, decisionLabel, reason || 'Evidence rejected');
+      });
+
+      rejectTx();
+
+      return res.json({
+        message: decision === 'resubmission_requested'
+          ? 'Resubmission requested from user with feedback.'
+          : 'Submission has been rejected.',
+        status: 'rejected',
+        reason
+      });
+    }
+  } catch (error) {
+    console.error('Review submission error:', error);
+    res.status(500).json({ error: 'Failed to record coordinator review' });
   }
 });
 
