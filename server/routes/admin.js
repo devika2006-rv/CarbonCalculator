@@ -166,14 +166,37 @@ router.get('/overview', requireAdmin, (req, res) => {
       LIMIT 20
     `).all();
 
+    const activeUsersToday = db.prepare(`
+      SELECT COUNT(*) as count FROM users
+      WHERE role = 'user' AND last_login_at IS NOT NULL AND date(last_login_at) = date('now')
+    `).get().count;
+
+    const totalLoginsCount = db.prepare(`
+      SELECT COALESCE(SUM(login_count), 0) as count FROM users WHERE role = 'user'
+    `).get().count;
+
+    let recentLogins = [];
+    try {
+      recentLogins = db.prepare(`
+        SELECT ull.id, ull.user_id, ull.email, ull.name, ull.auth_method, ull.ip_address, ull.logged_in_at as timestamp,
+               u.category, u.institution_name as institution, u.district
+        FROM user_login_logs ull
+        LEFT JOIN users u ON ull.user_id = u.id
+        ORDER BY ull.logged_in_at DESC
+        LIMIT 15
+      `).all();
+    } catch {}
+
     res.json({
       stats: {
         totalUsers,
         completedProfiles,
         newRegistrations7d,
         newRegistrations30d,
+        activeUsersToday,
         activeUsers7d,
         activeUsers30d,
+        totalLogins: totalLoginsCount,
         totalInstitutions,
         totalCalculations,
         calcsToday,
@@ -185,7 +208,8 @@ router.get('/overview', requireAdmin, (req, res) => {
       },
       categories,
       districts,
-      institutions
+      institutions,
+      recentLogins
     });
   } catch (error) {
     console.error('Admin overview error:', error);
@@ -243,6 +267,7 @@ router.get('/users', requireAdmin, (req, res) => {
       SELECT
         u.id, u.name, u.email, u.category, u.institution_name, u.institution_type,
         u.district, u.created_at, u.last_login_at,
+        COALESCE(u.login_count, 0) as login_count,
         CASE
           WHEN u.institution_name IS NOT NULL AND u.institution_name != '' AND u.district IS NOT NULL AND u.district != ''
           THEN 1 ELSE 0

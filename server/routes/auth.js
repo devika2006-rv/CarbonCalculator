@@ -48,8 +48,8 @@ router.post('/register', (req, res) => {
     const password_hash = bcrypt.hashSync(password, salt);
 
     const result = db.prepare(`
-      INSERT INTO users (name, email, password_hash, role, category, institution_name, institution_type, district, last_login_at)
-      VALUES (?, ?, ?, 'user', ?, ?, ?, ?, NULL)
+      INSERT INTO users (name, email, password_hash, role, category, institution_name, institution_type, district, last_login_at, login_count)
+      VALUES (?, ?, ?, 'user', ?, ?, ?, ?, CURRENT_TIMESTAMP, 1)
     `).run(
       name.trim(),
       email.toLowerCase().trim(),
@@ -61,6 +61,14 @@ router.post('/register', (req, res) => {
     );
 
     const newUserId = result.lastInsertRowid;
+
+    // Log the registration login event
+    try {
+      db.prepare(`
+        INSERT INTO user_login_logs (user_id, email, name, auth_method, ip_address, user_agent)
+        VALUES (?, ?, ?, 'register', ?, ?)
+      `).run(newUserId, email.toLowerCase().trim(), name.trim(), req.ip || '', req.headers['user-agent'] || '');
+    } catch {}
 
     // Initialize user points record
     db.prepare('INSERT OR IGNORE INTO user_points (user_id, total_points) VALUES (?, 0)').run(newUserId);
@@ -102,11 +110,22 @@ router.post('/login', (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    // Update last login
-    db.prepare('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
+    // Update last login and increment count
+    db.prepare('UPDATE users SET last_login_at = CURRENT_TIMESTAMP, login_count = COALESCE(login_count, 0) + 1 WHERE id = ?').run(user.id);
+
+    // Record login audit event
+    try {
+      db.prepare(`
+        INSERT INTO user_login_logs (user_id, email, name, auth_method, ip_address, user_agent)
+        VALUES (?, ?, ?, 'email', ?, ?)
+      `).run(user.id, user.email, user.name, req.ip || '', req.headers['user-agent'] || '');
+    } catch {}
+
+    // Fetch updated user with fresh last_login_at
+    const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, name: user.name, role: user.role },
+      { id: updatedUser.id, email: updatedUser.email, name: updatedUser.name, role: updatedUser.role },
       JWT_SECRET,
       { expiresIn: '30d' }
     );
@@ -114,7 +133,7 @@ router.post('/login', (req, res) => {
     res.json({
       message: 'Logged in successfully',
       token,
-      user: sanitizeUser(user)
+      user: sanitizeUser(updatedUser)
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -137,8 +156,8 @@ router.post('/google', (req, res) => {
       // Create new user with Google identity
       const dummyPassword = bcrypt.hashSync(Math.random().toString(36) + 'GoogleAuth@2026', 10);
       const result = db.prepare(`
-        INSERT INTO users (name, email, password_hash, role, category, institution_name, institution_type, district)
-        VALUES (?, ?, ?, 'user', ?, ?, ?, ?)
+        INSERT INTO users (name, email, password_hash, role, category, institution_name, institution_type, district, last_login_at, login_count)
+        VALUES (?, ?, ?, 'user', ?, ?, ?, ?, CURRENT_TIMESTAMP, 1)
       `).run(
         name || 'Google User',
         email.toLowerCase().trim(),
@@ -151,8 +170,17 @@ router.post('/google', (req, res) => {
       user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid);
       db.prepare('INSERT OR IGNORE INTO user_points (user_id, total_points) VALUES (?, 0)').run(user.id);
     } else {
-      db.prepare('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
+      db.prepare('UPDATE users SET last_login_at = CURRENT_TIMESTAMP, login_count = COALESCE(login_count, 0) + 1 WHERE id = ?').run(user.id);
+      user = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
     }
+
+    // Record login audit event
+    try {
+      db.prepare(`
+        INSERT INTO user_login_logs (user_id, email, name, auth_method, ip_address, user_agent)
+        VALUES (?, ?, ?, 'google', ?, ?)
+      `).run(user.id, user.email, user.name, req.ip || '', req.headers['user-agent'] || '');
+    } catch {}
 
     const token = jwt.sign(
       { id: user.id, email: user.email, name: user.name, role: user.role },

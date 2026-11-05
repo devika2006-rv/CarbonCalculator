@@ -364,6 +364,7 @@ export const api = {
           throw new Error('An account with this email address already exists. Please login.');
         }
 
+        const now = new Date().toISOString();
         const newUser: User = {
           id: Date.now(),
           name: userData.name,
@@ -373,12 +374,29 @@ export const api = {
           institution_name: userData.institution_name || '',
           institution_type: userData.institution_type || 'College',
           district: userData.district || 'Thrissur',
-          created_at: new Date().toISOString()
+          created_at: now,
+          last_login_at: now,
+          login_count: 1
         };
 
         registered.push({ ...newUser, password: userData.password });
         localStorage.setItem('cc_registered_users', JSON.stringify(registered));
         localStorage.setItem('cc_current_user', JSON.stringify(newUser));
+
+        // Record initial login audit event
+        const loginHistory = JSON.parse(localStorage.getItem('cc_login_history') || '[]');
+        loginHistory.unshift({
+          id: Date.now(),
+          userId: newUser.id,
+          name: newUser.name,
+          email: newUser.email,
+          category: newUser.category,
+          institution: newUser.institution_name || 'Individual',
+          district: newUser.district,
+          authMethod: 'Account Registration & Sign-In',
+          timestamp: now
+        });
+        localStorage.setItem('cc_login_history', JSON.stringify(loginHistory.slice(0, 50)));
 
         const token = 'user_token_' + Date.now();
         localStorage.setItem('cc_token', token);
@@ -401,6 +419,7 @@ export const api = {
         // Fallback: Client-side credential verification
         const email = credentials.email?.toLowerCase().trim();
         const pass = credentials.password;
+        const now = new Date().toISOString();
 
         // Admin credentials check
         if (email === 'admin@vastenergycell.in' && pass === 'vastEnergyCell@2026') {
@@ -413,12 +432,30 @@ export const api = {
             institution_name: 'Vidya Academy of Science & Technology',
             institution_type: 'College',
             district: 'Thrissur',
-            created_at: new Date().toISOString()
+            created_at: '2026-01-01T00:00:00.000Z',
+            last_login_at: now,
+            login_count: 1
           };
           const token = 'admin_token_' + Date.now();
           localStorage.setItem('cc_token', token);
           localStorage.setItem('cc_admin_token', token);
           localStorage.setItem('cc_current_user', JSON.stringify(adminUser));
+
+          // Record admin login event
+          const loginHistory = JSON.parse(localStorage.getItem('cc_login_history') || '[]');
+          loginHistory.unshift({
+            id: Date.now(),
+            userId: 1,
+            name: 'VAST Energy Cell Admin',
+            email: 'admin@vastenergycell.in',
+            category: 'Administrator',
+            institution: 'Vidya Academy of Science & Technology',
+            district: 'Thrissur',
+            authMethod: 'Admin Portal Login',
+            timestamp: now
+          });
+          localStorage.setItem('cc_login_history', JSON.stringify(loginHistory.slice(0, 50)));
+
           return { message: 'Administrative access authorized', token, user: adminUser };
         }
 
@@ -426,29 +463,79 @@ export const api = {
         const registered = JSON.parse(localStorage.getItem('cc_registered_users') || '[]');
         const match = registered.find((u: any) => u.email.toLowerCase() === email && u.password === pass);
         if (match) {
+          match.last_login_at = now;
+          match.login_count = (match.login_count || 0) + 1;
+          localStorage.setItem('cc_registered_users', JSON.stringify(registered));
+
           const { password: _, ...safeUser } = match;
           const token = 'user_token_' + Date.now();
           localStorage.setItem('cc_token', token);
           localStorage.setItem('cc_current_user', JSON.stringify(safeUser));
+
+          // Record login audit event
+          const loginHistory = JSON.parse(localStorage.getItem('cc_login_history') || '[]');
+          loginHistory.unshift({
+            id: Date.now(),
+            userId: match.id,
+            name: match.name,
+            email: match.email,
+            category: match.category || 'Student',
+            institution: match.institution_name || 'Individual',
+            district: match.district || 'Thrissur',
+            authMethod: 'Email & Password',
+            timestamp: now
+          });
+          localStorage.setItem('cc_login_history', JSON.stringify(loginHistory.slice(0, 50)));
+
           return { message: 'Login successful', token, user: safeUser };
         }
 
         // Demo user verification
         if (email === 'volunteer@vidya.ac.in' || email === 'student@vidya.ac.in') {
+          const isVolunteer = email === 'volunteer@vidya.ac.in';
           const demoUser: User = {
-            id: 101,
-            name: 'NSS Campus Volunteer',
+            id: isVolunteer ? 101 : 102,
+            name: isVolunteer ? 'NSS Campus Volunteer' : 'VAST Student Participant',
             email,
             role: 'user',
-            category: 'NSS Volunteer',
+            category: isVolunteer ? 'NSS Volunteer' : 'Student',
             institution_name: 'Vidya Academy of Science & Technology',
             institution_type: 'College',
             district: 'Thrissur',
-            created_at: new Date().toISOString()
+            created_at: '2026-02-01T00:00:00.000Z',
+            last_login_at: now,
+            login_count: 1
           };
+
+          // Save into registered users list so admin dashboard notes this user
+          const existingIdx = registered.findIndex((u: any) => u.email.toLowerCase() === email);
+          if (existingIdx >= 0) {
+            registered[existingIdx].last_login_at = now;
+            registered[existingIdx].login_count = (registered[existingIdx].login_count || 0) + 1;
+          } else {
+            registered.push({ ...demoUser, password: pass || 'demo123' });
+          }
+          localStorage.setItem('cc_registered_users', JSON.stringify(registered));
+
           const token = 'user_token_' + Date.now();
           localStorage.setItem('cc_token', token);
           localStorage.setItem('cc_current_user', JSON.stringify(demoUser));
+
+          // Record login audit event
+          const loginHistory = JSON.parse(localStorage.getItem('cc_login_history') || '[]');
+          loginHistory.unshift({
+            id: Date.now(),
+            userId: demoUser.id,
+            name: demoUser.name,
+            email: demoUser.email,
+            category: demoUser.category,
+            institution: demoUser.institution_name,
+            district: demoUser.district,
+            authMethod: 'Campus Credential Sign-In',
+            timestamp: now
+          });
+          localStorage.setItem('cc_login_history', JSON.stringify(loginHistory.slice(0, 50)));
+
           return { message: 'Login successful', token, user: demoUser };
         }
 
@@ -463,19 +550,50 @@ export const api = {
           body: JSON.stringify(payload),
         });
       } catch {
-        const email = payload.email || 'campus.user@vidya.ac.in';
+        const email = (payload.email || 'campus.user@vidya.ac.in').toLowerCase();
         const name = payload.name || 'Campus Volunteer';
-        const googleUser: User = {
+        const now = new Date().toISOString();
+        const registered = JSON.parse(localStorage.getItem('cc_registered_users') || '[]');
+
+        let googleUser: User;
+        const existingIdx = registered.findIndex((u: any) => u.email.toLowerCase() === email);
+        if (existingIdx >= 0) {
+          registered[existingIdx].last_login_at = now;
+          registered[existingIdx].login_count = (registered[existingIdx].login_count || 0) + 1;
+          googleUser = registered[existingIdx];
+        } else {
+          googleUser = {
+            id: Date.now(),
+            name,
+            email,
+            role: 'user',
+            category: payload.category || 'Student',
+            institution_name: payload.institution_name || 'Vidya Academy of Science & Technology',
+            institution_type: payload.institution_type || 'College',
+            district: payload.district || 'Thrissur',
+            created_at: now,
+            last_login_at: now,
+            login_count: 1
+          };
+          registered.push(googleUser);
+        }
+        localStorage.setItem('cc_registered_users', JSON.stringify(registered));
+
+        // Record login audit event
+        const loginHistory = JSON.parse(localStorage.getItem('cc_login_history') || '[]');
+        loginHistory.unshift({
           id: Date.now(),
-          name,
-          email,
-          role: 'user',
-          category: 'Student',
-          institution_name: 'Vidya Academy of Science & Technology',
-          institution_type: 'College',
-          district: 'Thrissur',
-          created_at: new Date().toISOString()
-        };
+          userId: googleUser.id,
+          name: googleUser.name,
+          email: googleUser.email,
+          category: googleUser.category,
+          institution: googleUser.institution_name || 'Individual',
+          district: googleUser.district,
+          authMethod: 'Google OAuth',
+          timestamp: now
+        });
+        localStorage.setItem('cc_login_history', JSON.stringify(loginHistory.slice(0, 50)));
+
         const token = 'google_token_' + Date.now();
         localStorage.setItem('cc_token', token);
         localStorage.setItem('cc_current_user', JSON.stringify(googleUser));
@@ -941,12 +1059,13 @@ export const api = {
 
     getOverview: async () => {
       try {
-        return await request<{ stats: any; categories: any[]; districts: any[]; institutions: any[] }>('/admin/overview');
+        return await request<{ stats: any; categories: any[]; districts: any[]; institutions: any[]; recentLogins?: any[] }>('/admin/overview');
       } catch {
         const registered: any[] = JSON.parse(localStorage.getItem('cc_registered_users') || '[]');
         const userHistory: any[] = JSON.parse(localStorage.getItem('cc_user_history') || '[]');
         const completedChallenges: any[] = JSON.parse(localStorage.getItem('cc_completed_challenges') || '[]');
         const contactEnquiries: any[] = JSON.parse(localStorage.getItem('cc_contact_enquiries') || '[]');
+        const loginHistory: any[] = JSON.parse(localStorage.getItem('cc_login_history') || '[]');
 
         const completedProfiles = registered.filter(u => u.institution_name && u.district).length;
         const now = Date.now();
@@ -957,8 +1076,10 @@ export const api = {
 
         const newRegistrations7d = registered.filter(u => new Date(u.created_at).getTime() >= sevenDaysAgo).length;
         const newRegistrations30d = registered.filter(u => new Date(u.created_at).getTime() >= thirtyDaysAgo).length;
+        const activeUsersToday = registered.filter(u => u.last_login_at && new Date(u.last_login_at).getTime() >= startOfToday).length;
         const activeUsers7d = registered.filter(u => u.last_login_at && new Date(u.last_login_at).getTime() >= sevenDaysAgo).length;
         const activeUsers30d = registered.filter(u => u.last_login_at && new Date(u.last_login_at).getTime() >= thirtyDaysAgo).length;
+        const totalLogins = registered.reduce((acc, u) => acc + (Number(u.login_count) || (u.last_login_at ? 1 : 0)), 0);
 
         const calcsToday = userHistory.filter(c => new Date(c.calculated_at).getTime() >= startOfToday).length;
         const calcsThisMonth = userHistory.filter(c => new Date(c.calculated_at).getTime() >= startOfMonth).length;
@@ -1005,8 +1126,10 @@ export const api = {
             completedProfiles,
             newRegistrations7d,
             newRegistrations30d,
+            activeUsersToday,
             activeUsers7d,
             activeUsers30d,
+            totalLogins,
             totalInstitutions: instMap.size,
             totalCalculations: userHistory.length,
             calcsToday,
@@ -1018,7 +1141,8 @@ export const api = {
           },
           categories,
           districts,
-          institutions: Array.from(instMap.values())
+          institutions: Array.from(instMap.values()),
+          recentLogins: loginHistory.slice(0, 15)
         };
       }
     },
@@ -1038,7 +1162,9 @@ export const api = {
           is_profile_complete: u.institution_name && u.district ? 1 : 0,
           total_points: u.total_points || 0,
           calc_count: u.calc_count || 0,
-          challenge_count: u.challenge_count || 0
+          challenge_count: u.challenge_count || 0,
+          last_login_at: u.last_login_at || null,
+          login_count: u.login_count || (u.last_login_at ? 1 : 0)
         }));
 
         if (filters.search) {

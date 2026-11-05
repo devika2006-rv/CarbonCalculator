@@ -13,6 +13,7 @@ export interface User {
   district: string;
   created_at: string;
   last_login_at?: string;
+  login_count?: number;
 }
 
 export interface UserStats {

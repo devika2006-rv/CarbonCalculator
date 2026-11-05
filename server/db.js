@@ -130,6 +130,22 @@ export function initDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- User Login Audit Logs
+    CREATE TABLE IF NOT EXISTS user_login_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      email TEXT NOT NULL,
+      name TEXT NOT NULL,
+      auth_method TEXT DEFAULT 'email', -- 'email', 'google', 'admin'
+      ip_address TEXT DEFAULT '',
+      user_agent TEXT DEFAULT '',
+      logged_in_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_login_logs_user_id ON user_login_logs(user_id);
+    CREATE INDEX IF NOT EXISTS idx_login_logs_date ON user_login_logs(logged_in_at);
+
     -- Challenge Submissions (Photo Proof Workflow)
     CREATE TABLE IF NOT EXISTS challenge_submissions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -571,6 +587,11 @@ export function initDatabase() {
     });
     updateAll(challenges);
   }
+
+  // Ensure login_count column exists
+  try {
+    db.prepare('ALTER TABLE users ADD COLUMN login_count INTEGER DEFAULT 0').run();
+  } catch {}
 
   // Ensure default secure admin user exists if not already present
   const adminExists = db.prepare('SELECT id FROM users WHERE role = ?').get('admin');

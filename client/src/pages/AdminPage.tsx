@@ -532,15 +532,17 @@ export const AdminPage: React.FC<AdminPageProps> = ({ setActiveTab }) => {
 
                 {/* 2. Active Users (Authentications Only) */}
                 <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-1">
-                  <span className="text-[11px] font-medium text-slate-500 uppercase">Active (7d)</span>
+                  <span className="text-[11px] font-medium text-slate-500 uppercase">Active Users</span>
                   <p className="text-2xl font-bold text-slate-900">
-                    {overview.stats.activeUsers7d !== undefined ? overview.stats.activeUsers7d : overview.stats.activeUsers}
+                    {overview.stats.activeUsers7d !== undefined ? overview.stats.activeUsers7d : (overview.stats.activeUsers || 0)}
                   </p>
                   <div className="text-[10px] text-slate-500 space-y-0.5">
-                    <span className="text-indigo-700 font-semibold block">
-                      {overview.stats.activeUsers30d !== undefined ? `${overview.stats.activeUsers30d} active (30d)` : 'Recent logins'}
+                    <span className="text-emerald-700 font-semibold block">
+                      {overview.stats.activeUsersToday || 0} active today • {overview.stats.activeUsers30d || 0} in 30d
                     </span>
-                    <span className="text-slate-400 block">Authenticated logins</span>
+                    <span className="text-slate-400 block">
+                      {overview.stats.totalLogins !== undefined ? `${overview.stats.totalLogins} total logins logged` : 'Authenticated logins'}
+                    </span>
                   </div>
                 </div>
 
@@ -673,6 +675,107 @@ export const AdminPage: React.FC<AdminPageProps> = ({ setActiveTab }) => {
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* Recent Authentication & Login Activity Audit Trail */}
+              <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-emerald-600" />
+                      Recent Authentication & Login Audit Trail
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Live audit log of all successful user logins, Google single-sign-ons, and registrations.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      {overview.stats.totalLogins || overview.recentLogins?.length || 0} total sessions logged
+                    </span>
+                  </div>
+                </div>
+
+                {overview.recentLogins && overview.recentLogins.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-100 text-[11px] font-bold uppercase text-slate-400">
+                          <th className="py-2.5 px-3">Participant</th>
+                          <th className="py-2.5 px-3">Role / Category</th>
+                          <th className="py-2.5 px-3">Institution & District</th>
+                          <th className="py-2.5 px-3">Auth Method</th>
+                          <th className="py-2.5 px-3">Timestamp</th>
+                          <th className="py-2.5 px-3 text-right">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {overview.recentLogins.slice(0, 15).map((log: any, idx: number) => {
+                          const logTime = new Date(log.timestamp || log.login_at || Date.now());
+                          const isToday = new Date().toDateString() === logTime.toDateString();
+                          return (
+                            <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                              <td className="py-2.5 px-3 font-semibold text-slate-900">
+                                <div>{log.name || 'User'}</div>
+                                <div className="text-[10px] text-slate-400 font-normal">{log.email}</div>
+                              </td>
+                              <td className="py-2.5 px-3 capitalize text-slate-600">
+                                <span className="inline-block px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-medium">
+                                  {log.user_category || log.role || 'Participant'}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-slate-600">
+                                <div className="font-medium text-slate-800">{log.institution_name || '—'}</div>
+                                <div className="text-[10px] text-slate-400">{log.district || 'Kerala'}</div>
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
+                                  log.auth_method === 'google'
+                                    ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                    : log.auth_method === 'campus_credentials'
+                                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                    : log.auth_method === 'registration'
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : 'bg-slate-100 text-slate-700 border-slate-200'
+                                }`}>
+                                  {log.auth_method === 'google' ? 'Google Auth' :
+                                   log.auth_method === 'campus_credentials' ? 'Campus Login' :
+                                   log.auth_method === 'registration' ? 'New Account' : 'Password'}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">
+                                <div>{logTime.toLocaleDateString()}</div>
+                                <div className="text-[10px] text-slate-400">
+                                  {logTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                {isToday ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold text-[10px] border border-emerald-200">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    Today
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium text-[10px]">
+                                    Recorded
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center text-slate-400 text-xs space-y-2">
+                    <Clock className="w-8 h-8 mx-auto opacity-30 text-slate-400" />
+                    <p className="font-semibold text-slate-600">No login events recorded yet.</p>
+                    <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                      All new student, coordinator, and administrator logins will automatically be logged here with timestamps and authentication methods.
+                    </p>
+                  </div>
+                )}
               </div>
             </>
           ) : (
@@ -1056,11 +1159,52 @@ export const AdminPage: React.FC<AdminPageProps> = ({ setActiveTab }) => {
                           </span>
                         )}
                       </td>
-                      <td className="py-2.5 px-3 text-slate-500">
+                      <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">
                         {u.last_login_at ? (
-                          <span>{new Date(u.last_login_at).toLocaleDateString()} {new Date(u.last_login_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1.5">
+                              {(() => {
+                                const diffDays = (Date.now() - new Date(u.last_login_at).getTime()) / (1000 * 60 * 60 * 24);
+                                if (diffDays <= 1) {
+                                  return (
+                                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                      Active Today
+                                    </span>
+                                  );
+                                } else if (diffDays <= 7) {
+                                  return (
+                                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                      Active 7d
+                                    </span>
+                                  );
+                                } else {
+                                  return (
+                                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-medium bg-slate-100 text-slate-500">
+                                      Past Active
+                                    </span>
+                                  );
+                                }
+                              })()}
+                              {u.login_count && u.login_count > 0 ? (
+                                <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-1 rounded">
+                                  {u.login_count} {u.login_count === 1 ? 'login' : 'logins'}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="text-[11px] font-medium text-slate-800">
+                              {new Date(u.last_login_at).toLocaleDateString()}{' '}
+                              <span className="text-slate-400 font-normal">
+                                {new Date(u.last_login_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                          </div>
                         ) : (
-                          <span className="text-slate-400 italic">No logins recorded</span>
+                          <div className="space-y-0.5">
+                            <span className="inline-block px-1.5 py-0.2 rounded text-[9px] font-medium bg-slate-100 text-slate-400">
+                              No logins recorded
+                            </span>
+                            <div className="text-[10px] text-slate-400">Never signed in</div>
+                          </div>
                         )}
                       </td>
                       <td className="py-2.5 px-3 font-semibold text-slate-800">
