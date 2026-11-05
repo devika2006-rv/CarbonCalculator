@@ -73,8 +73,8 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                   <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-600' : 'text-slate-400'}`} />
                   <span>{item.label}</span>
                   {item.id === 'challenges' && (
-                    <span className="px-1.5 py-0.5 text-[9px] font-extrabold uppercase bg-emerald-100 text-emerald-800 rounded-md tracking-wider">
-                      AI Proof
+                    <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase bg-amber-100 text-amber-800 rounded-md tracking-wider">
+                      Soon
                     </span>
                   )}
                 </button>
@@ -203,10 +203,10 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                     <span>{item.label}</span>
                   </div>
                   {item.id === 'challenges' && (
-                    <span className={`px-2 py-0.5 text-[10px] font-extrabold uppercase rounded-md tracking-wider ${
-                      isActive ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-800'
+                    <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-md tracking-wider ${
+                      isActive ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
                     }`}>
-                      AI Proof
+                      Soon
                     </span>
                   )}
                 </button>

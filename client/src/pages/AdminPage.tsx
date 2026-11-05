@@ -471,14 +471,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({ setActiveTab }) => {
 
       {/* Admin Sub-Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-slate-200">
-        {[
+        {([
           { id: 'overview', label: 'Platform Overview', icon: TrendingUp },
-          { id: 'verifications', label: 'Challenge Proof Reviews', icon: Camera, badge: submissionCounts.needsReview },
           { id: 'users', label: 'User Directory', icon: Users },
           { id: 'analytics', label: 'Usage Analytics', icon: Calculator },
           { id: 'enquiries', label: 'Contact Messages', icon: Mail },
           { id: 'exports', label: 'Reports & Data Export', icon: Download },
-        ].map((tab) => {
+        ] as { id: string; label: string; icon: any; badge?: number }[]).map((tab) => {
           const Icon = tab.icon;
           const isActive = adminTab === tab.id;
           return (

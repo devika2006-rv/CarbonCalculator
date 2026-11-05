@@ -443,17 +443,17 @@ export const LearnPage: React.FC<LearnPageProps> = ({ setActiveTab }) => {
               <p className="italic text-slate-700">{activeModalTopic.realWorldExample}</p>
             </div>
 
-            {/* Related Challenge Link */}
+            {/* Related Calculator Link */}
             <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-xs text-slate-500">Related Green Action:</span>
+              <span className="text-xs text-slate-500">Ready to measure your baseline?</span>
               <button
                 onClick={() => {
                   setActiveModalTopic(null);
-                  setActiveTab('challenges');
+                  setActiveTab('calculator');
                 }}
                 className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-800"
               >
-                <span>Take Challenge</span>
+                <span>Calculate Impact</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>

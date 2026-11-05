@@ -152,23 +152,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setActiveTab }) =>
         </div>
       </div>
 
-      {/* Pending Challenge Proofs Notification */}
-      {pendingSubmissionsCount > 0 && (
-        <div className="p-4 bg-amber-50 border border-amber-200/90 rounded-2xl flex items-center justify-between text-left text-xs sm:text-sm">
-          <div className="flex items-center gap-2.5 text-amber-900 font-semibold">
-            <Camera className="w-5 h-5 text-amber-600 flex-shrink-0" />
-            <span>
-              You have <strong>{pendingSubmissionsCount} challenge photo proof{pendingSubmissionsCount > 1 ? 's' : ''}</strong> currently under review.
-            </span>
-          </div>
-          <button
-            onClick={() => setActiveTab('challenges')}
-            className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition-colors shadow-xs"
-          >
-            View Status
-          </button>
-        </div>
-      )}
 
       {/* Main Stats or Empty State */}
       {!latest ? (
@@ -357,7 +340,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setActiveTab }) =>
         ) : (
           <div className="p-6 bg-slate-50 rounded-2xl text-center text-xs text-slate-500 space-y-1">
             <p>No badges unlocked yet.</p>
-            <p>Complete your first carbon calculation or daily green challenge to earn your inaugural badge!</p>
+            <p>Complete your first carbon calculation to earn your inaugural badge!</p>
           </div>
         )}
       </div>
